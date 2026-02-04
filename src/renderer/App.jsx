@@ -107,9 +107,15 @@ export default function App() {
                   <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
                 </svg>
               </button>
+              <div className="header-divider"></div>
               <div className="user">
                 <span className="user-name">考生用户</span>
-                <div className="avatar" />
+                <div className="avatar-wrap">
+                  <div className="avatar" />
+                  <svg className="avatar-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M7 10l5 5 5-5z"/>
+                  </svg>
+                </div>
                 <button
                   className="theme-toggle"
                   onClick={() => setTheme(theme === "light" ? "dark" : "light")}
@@ -257,48 +263,39 @@ export default function App() {
                   </div>
                 </div>
                 <a className="side-link">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
                     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
                   </svg>
-                  Social Trading Platform
+                  公考资讯平台
                 </a>
 
                 <div className="side-card list">
                   <div className="list-item">
-                    <div className="list-icon google">
-                      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                    <div className="list-icon news">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
                     </div>
                     <div>
-                      <span>Google</span>
-                      <strong>Alphabet Inc.</strong>
+                      <span>公考动态</span>
+                      <strong>2025国考报名</strong>
                     </div>
                   </div>
                   <div className="list-item">
-                    <div className="list-icon foursquare">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.727 3.465H7.818c-.91 0-1.636.727-1.636 1.636v14.727c0 .545.364.909.909.909.182 0 .364-.091.545-.182l4.364-3.273 4.364 3.273c.182.091.364.182.545.182.545 0 .909-.364.909-.909V5.101c0-.909-.727-1.636-1.091-1.636z"/></svg>
+                    <div className="list-icon policy">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
                     </div>
                     <div>
-                      <span>Foursquare</span>
-                      <strong>Location Tech</strong>
+                      <span>政策解读</span>
+                      <strong>省考新政策</strong>
                     </div>
                   </div>
                   <div className="list-item">
-                    <div className="list-icon kickstarter">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                    <div className="list-icon tips">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>
                     </div>
                     <div>
-                      <span>Kickstarter</span>
-                      <strong>Crowdfunding</strong>
-                    </div>
-                  </div>
-                  <div className="list-item">
-                    <div className="list-icon kakao">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="#3C1E1E"><path d="M12 3c-5.52 0-10 3.59-10 8 0 2.84 1.89 5.33 4.72 6.72-.21.78-.77 2.82-.88 3.26-.14.54.2.53.42.39.17-.11 2.74-1.86 3.85-2.61.61.09 1.24.14 1.89.14 5.52 0 10-3.59 10-8s-4.48-8-10-8z"/></svg>
-                    </div>
-                    <div>
-                      <span>Kakao</span>
-                      <strong>Messaging</strong>
+                      <span>备考技巧</span>
+                      <strong>行测高分秘籍</strong>
                     </div>
                   </div>
                 </div>
@@ -306,20 +303,56 @@ export default function App() {
 
               <div className="side-section">
                 <div className="side-section-title">
-                  <h4>My Income</h4>
+                  <h4>热门题库</h4>
+                  <span className="info-dot" />
+                </div>
+                <div className="side-card list">
+                  <div className="list-item">
+                    <div className="list-icon exam">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z"/></svg>
+                    </div>
+                    <div>
+                      <span>言语理解</span>
+                      <strong>1,245题</strong>
+                    </div>
+                  </div>
+                  <div className="list-item">
+                    <div className="list-icon math">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14h-2v-4H8v-2h4V7h2v4h4v2h-4v4z"/></svg>
+                    </div>
+                    <div>
+                      <span>数量关系</span>
+                      <strong>986题</strong>
+                    </div>
+                  </div>
+                  <div className="list-item">
+                    <div className="list-icon logic">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                    </div>
+                    <div>
+                      <span>判断推理</span>
+                      <strong>1,593题</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="side-section">
+                <div className="side-section-title">
+                  <h4>学习进度</h4>
                   <span className="info-dot" />
                 </div>
                 <div className="side-card income">
                   <div className="income-left">
                     <div className="income-ring">
-                      <span>46%</span>
+                      <span>68%</span>
                     </div>
                   </div>
                   <div className="income-center">
-                    <span className="income-label">Legend</span>
+                    <span className="income-label">本周目标</span>
                   </div>
                   <div className="income-right">
-                    <span className="income-change">+25%</span>
+                    <span className="income-change">+12%</span>
                   </div>
                 </div>
               </div>

@@ -1,31 +1,48 @@
 import React, { useEffect, useState } from "react";
 
 const ChartLines = () => (
-  <svg className="chart-lines" viewBox="0 0 680 220" aria-hidden="true">
+  <svg className="chart-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
     <defs>
       <linearGradient id="chartPrimary" x1="0" x2="1" y1="0" y2="0">
-        <stop offset="0%" stopColor="#6d5efb" stopOpacity="0.2" />
+        <stop offset="0%" stopColor="#6d5efb" stopOpacity="0.6" />
         <stop offset="100%" stopColor="#6d5efb" stopOpacity="1" />
       </linearGradient>
       <linearGradient id="chartGhost" x1="0" x2="1" y1="0" y2="0">
-        <stop offset="0%" stopColor="#c9c8f6" stopOpacity="0.35" />
-        <stop offset="100%" stopColor="#c9c8f6" stopOpacity="0.65" />
+        <stop offset="0%" stopColor="#9ca3af" stopOpacity="0.4" />
+        <stop offset="100%" stopColor="#9ca3af" stopOpacity="0.6" />
+      </linearGradient>
+      <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#6d5efb" stopOpacity="0.4" />
+        <stop offset="100%" stopColor="#6d5efb" stopOpacity="0.05" />
       </linearGradient>
     </defs>
+    {/* 横线坐标轴 - 更透明 */}
+    <line x1="0" y1="15" x2="100" y2="15" stroke="currentColor" strokeOpacity="0.1" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
+    <line x1="0" y1="40" x2="100" y2="40" stroke="currentColor" strokeOpacity="0.1" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
+    <line x1="0" y1="65" x2="100" y2="65" stroke="currentColor" strokeOpacity="0.1" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
+    <line x1="0" y1="90" x2="100" y2="90" stroke="currentColor" strokeOpacity="0.1" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
+    {/* 曲线下方渐变区域 */}
     <path
-      d="M8 150 C90 90, 150 170, 230 120 C300 70, 340 130, 410 80 C470 35, 560 90, 670 115"
+      d="M0 65 C12 50, 20 70, 32 58 C44 42, 52 60, 62 48 C74 30, 86 45, 100 52 L100 100 L0 100 Z"
+      fill="url(#areaGradient)"
+    />
+    {/* 主曲线 - 紫色 */}
+    <path
+      d="M0 65 C12 50, 20 70, 32 58 C44 42, 52 60, 62 48 C74 30, 86 45, 100 52"
       fill="none"
       stroke="url(#chartPrimary)"
-      strokeWidth="4.5"
+      strokeWidth="2"
       strokeLinecap="round"
+      vectorEffect="non-scaling-stroke"
     />
+    {/* 次曲线 - 灰色 */}
     <path
-      d="M8 170 C90 120, 150 190, 230 160 C300 120, 360 170, 430 140 C500 110, 560 150, 670 160"
+      d="M0 75 C12 62, 20 80, 32 70 C44 58, 56 75, 66 65 C78 55, 88 68, 100 72"
       fill="none"
       stroke="url(#chartGhost)"
-      strokeWidth="4"
+      strokeWidth="2"
       strokeLinecap="round"
-      opacity="0.7"
+      vectorEffect="non-scaling-stroke"
     />
   </svg>
 );
@@ -130,9 +147,17 @@ export default function App() {
             <section className="main-panel">
               <div className="breadcrumb">学习中心 &gt; 行测专项</div>
               <div className="brand-row">
-                <div className="brand-mark" />
+                <div className="brand-mark">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                  </svg>
+                </div>
                 <h2>公考刷题</h2>
-                <button className="add-btn">+</button>
+                <button className="add-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M12 5v14M5 12h14"/>
+                  </svg>
+                </button>
               </div>
 
               <div className="chart-card">
@@ -144,9 +169,12 @@ export default function App() {
                     </svg>
                   </div>
                   <div className="chart-controls">
+                    <div className="chart-legend">
+                      <span className="chart-legend-line primary"></span>
+                      <span className="chart-legend-line ghost"></span>
+                    </div>
                     <span>本月练习</span>
                     <button className="chip">2025年2月</button>
-                    <button className="dot">···</button>
                   </div>
                 </div>
                 <div className="chart-grid">

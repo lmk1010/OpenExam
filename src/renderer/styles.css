@@ -73,7 +73,7 @@ button {
 }
 
 .rail {
-  background: #ffffff;
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -145,7 +145,7 @@ button {
 
 .rail-bottom {
   margin-top: auto;
-  background: #f3f4f9;
+  background: var(--surface-soft);
   border-radius: 12px;
   padding: 8px 6px;
   display: flex;
@@ -367,20 +367,9 @@ button {
   height: 32px;
   border-radius: 10px;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-  position: relative;
-  overflow: hidden;
-}
-
-.brand-mark::before {
-  content: "";
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  width: 12px;
-  height: 12px;
-  background: #4ade80;
-  border-radius: 50%;
-  box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+  display: grid;
+  place-items: center;
+  color: #4ade80;
 }
 
 .add-btn {
@@ -390,8 +379,6 @@ button {
   border: 2px dashed var(--accent);
   background: transparent;
   color: var(--accent);
-  font-size: 16px;
-  font-weight: 500;
   cursor: pointer;
   display: grid;
   place-items: center;
@@ -412,7 +399,7 @@ button {
   justify-content: space-between;
   font-size: 11px;
   color: var(--muted);
-  margin-bottom: 6px;
+  margin-bottom: 12px;
 }
 
 .chart-title {
@@ -437,6 +424,27 @@ button {
   align-items: center;
   gap: 10px;
   font-size: 11px;
+}
+
+.chart-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chart-legend-line {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.chart-legend-line.primary {
+  background: var(--accent);
+}
+
+.chart-legend-line.ghost {
+  background: #9ca3af;
+  opacity: 0.5;
 }
 
 .chip {
@@ -480,15 +488,16 @@ button {
 
 .chart-canvas {
   position: relative;
-  background: linear-gradient(180deg, rgba(109, 94, 251, 0.06), transparent 60%);
+  background: transparent;
   border-radius: 12px;
-  padding: 12px 10px 28px;
+  padding: 12px 0 28px;
   min-height: 200px;
 }
 
 .chart-lines {
   width: 100%;
   height: 160px;
+  overflow: visible;
 }
 
 .chart-marker {
@@ -538,8 +547,8 @@ button {
 
 .chart-axis {
   position: absolute;
-  left: 14px;
-  right: 14px;
+  left: 0;
+  right: 0;
   bottom: 6px;
   display: flex;
   justify-content: space-between;

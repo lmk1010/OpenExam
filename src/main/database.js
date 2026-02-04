@@ -226,6 +226,72 @@ function getWrongQuestions() {
   }));
 }
 
+// 获取分类统计
+function getCategoryStats() {
+  const stats = db.prepare(`
+    SELECT
+      category,
+      COUNT(*) as total,
+      0 as done
+    FROM questions
+    GROUP BY category
+  `).all();
+
+  // 获取已做题数（从练习记录中统计）
+  const doneStats = db.prepare(`
+    SELECT
+      q.category,
+      COUNT(DISTINCT q.id) as done
+    FROM questions q
+    INNER JOIN practice_records pr ON pr.paper_id = q.paper_id
+    WHERE pr.status = 'completed'
+    GROUP BY q.category
+  `).all();
+
+  const doneMap = {};
+  doneStats.forEach(d => { doneMap[d.category] = d.done; });
+
+  return stats.map(s => ({
+    ...s,
+    done: doneMap[s.category] || 0
+  }));
+}
+
+// 获取子分类统计
+function getSubCategoryStats(category) {
+  return db.prepare(`
+    SELECT
+      sub_category as subCategory,
+      COUNT(*) as count
+    FROM questions
+    WHERE category = ?
+    GROUP BY sub_category
+  `).all(category);
+}
+
+// 获取练习统计
+function getPracticeStats() {
+  const totalQuestions = db.prepare('SELECT COUNT(*) as count FROM questions').get().count;
+
+  const completedRecords = db.prepare(`
+    SELECT COUNT(*) as count, SUM(correct_count) as correct, SUM(total_count) as total
+    FROM practice_records
+    WHERE status = 'completed'
+  `).get();
+
+  const wrongCount = db.prepare('SELECT COUNT(*) as count FROM wrong_questions').get().count;
+
+  return {
+    totalQuestions,
+    totalDone: completedRecords.total || 0,
+    correctCount: completedRecords.correct || 0,
+    wrongCount,
+    accuracy: completedRecords.total > 0
+      ? Math.round((completedRecords.correct / completedRecords.total) * 100)
+      : 0
+  };
+}
+
 // 关闭数据库
 function closeDatabase() {
   if (db) {
@@ -241,5 +307,8 @@ module.exports = {
   getPracticeRecords,
   addWrongQuestion,
   getWrongQuestions,
+  getCategoryStats,
+  getSubCategoryStats,
+  getPracticeStats,
   closeDatabase
 };

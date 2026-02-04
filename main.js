@@ -84,6 +84,18 @@ ipcMain.handle("db:getWrongQuestions", () => {
   return database.getWrongQuestions();
 });
 
+ipcMain.handle("db:getCategoryStats", () => {
+  return database.getCategoryStats();
+});
+
+ipcMain.handle("db:getSubCategoryStats", (event, category) => {
+  return database.getSubCategoryStats(category);
+});
+
+ipcMain.handle("db:getPracticeStats", () => {
+  return database.getPracticeStats();
+});
+
 app.on("window-all-closed", () => {
   database.closeDatabase();
   if (process.platform !== "darwin") {

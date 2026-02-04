@@ -193,6 +193,34 @@ export default function App() {
 
 // 原始主页组件
 function OriginalHomePage({ ChartLines }) {
+  const [stats, setStats] = useState({ totalQuestions: 0, totalDone: 0, accuracy: 0, wrongCount: 0, correctCount: 0 });
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!window.openexam?.db) return;
+      try {
+        const practiceStats = await window.openexam.db.getPracticeStats();
+        const categoryStats = await window.openexam.db.getCategoryStats();
+        setStats(practiceStats);
+        setCategories(categoryStats);
+      } catch (err) {
+        console.error('加载统计数据失败:', err);
+      }
+    };
+    loadData();
+  }, []);
+
+  const categoryNames = {
+    yanyu: '言语理解',
+    shuliang: '数量关系',
+    panduan: '判断推理',
+    ziliao: '资料分析',
+    changshi: '常识判断'
+  };
+
+  const totalQuestions = categories.reduce((sum, c) => sum + c.total, 0);
+
   return (
     <>
       <section className="main-panel">
@@ -238,8 +266,8 @@ function OriginalHomePage({ ChartLines }) {
               <ChartLines />
               <div className="chart-marker">
                 <span className="tooltip">
-                  <small>本月已做</small>
-                  <strong>1,286</strong>
+                  <small>累计已做</small>
+                  <strong>{stats.totalDone.toLocaleString()}</strong>
                   <em>道题</em>
                 </span>
                 <div className="marker-dot" />
@@ -263,33 +291,21 @@ function OriginalHomePage({ ChartLines }) {
             <div className="donut">
               <div className="donut-ring">
                 <div className="donut-inner">
-                  <span>3,824</span>
+                  <span>{totalQuestions.toLocaleString()}</span>
                   <small>总题数</small>
                 </div>
               </div>
             </div>
             <div className="legend">
-              <div className="legend-item">
-                <span className="legend-dot"></span>
-                <div className="legend-text">
-                  <span className="legend-label">言语理解</span>
-                  <strong>1,245 道</strong>
+              {categories.slice(0, 3).map((cat, idx) => (
+                <div key={cat.category} className="legend-item">
+                  <span className={`legend-dot ${idx === 1 ? 'mid' : idx === 2 ? 'light' : ''}`}></span>
+                  <div className="legend-text">
+                    <span className="legend-label">{categoryNames[cat.category] || cat.category}</span>
+                    <strong>{cat.total.toLocaleString()} 道</strong>
+                  </div>
                 </div>
-              </div>
-              <div className="legend-item">
-                <span className="legend-dot mid"></span>
-                <div className="legend-text">
-                  <span className="legend-label">数量关系</span>
-                  <strong>986 道</strong>
-                </div>
-              </div>
-              <div className="legend-item">
-                <span className="legend-dot light"></span>
-                <div className="legend-text">
-                  <span className="legend-label">判断推理</span>
-                  <strong>1,593 道</strong>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -300,11 +316,11 @@ function OriginalHomePage({ ChartLines }) {
             </div>
             <div className="accuracy-content">
               <div className="active-total">
-                <strong>78%</strong>
+                <strong>{stats.accuracy}%</strong>
                 <span>综合正确率</span>
               </div>
               <div className="progress">
-                <span className="progress-fill" style={{ width: "78%" }} />
+                <span className="progress-fill" style={{ width: `${stats.accuracy}%` }} />
               </div>
               <div className="active-split">
                 <div className="split-item">
@@ -316,9 +332,9 @@ function OriginalHomePage({ ChartLines }) {
                   <span className="split-label">待加强</span>
                 </div>
               </div>
-              <div className="active-split">
-                <div><span className="split-value">2,156 道</span></div>
-                <div><span className="split-value">612 道</span></div>
+              <div className="active-split values">
+                <div><span className="split-value">{stats.correctCount.toLocaleString()} 道</span></div>
+                <div><span className="split-value">{stats.wrongCount.toLocaleString()} 道</span></div>
               </div>
             </div>
           </div>
@@ -384,33 +400,17 @@ function OriginalHomePage({ ChartLines }) {
             <span className="info-dot" />
           </div>
           <div className="side-card list">
-            <div className="list-item">
-              <div className="list-icon exam">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z"/></svg>
+            {categories.slice(0, 3).map(cat => (
+              <div key={cat.category} className="list-item">
+                <div className={`list-icon ${cat.category === 'yanyu' ? 'exam' : cat.category === 'shuliang' ? 'math' : 'logic'}`}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z"/></svg>
+                </div>
+                <div>
+                  <span>{categoryNames[cat.category] || cat.category}</span>
+                  <strong>{cat.total.toLocaleString()}题</strong>
+                </div>
               </div>
-              <div>
-                <span>言语理解</span>
-                <strong>1,245题</strong>
-              </div>
-            </div>
-            <div className="list-item">
-              <div className="list-icon math">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14h-2v-4H8v-2h4V7h2v4h4v2h-4v4z"/></svg>
-              </div>
-              <div>
-                <span>数量关系</span>
-                <strong>986题</strong>
-              </div>
-            </div>
-            <div className="list-item">
-              <div className="list-icon logic">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-              </div>
-              <div>
-                <span>判断推理</span>
-                <strong>1,593题</strong>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
@@ -422,14 +422,14 @@ function OriginalHomePage({ ChartLines }) {
           <div className="side-card income">
             <div className="income-left">
               <div className="income-ring">
-                <span>68%</span>
+                <span>{totalQuestions > 0 ? Math.round(stats.totalDone / totalQuestions * 100) : 0}%</span>
               </div>
             </div>
             <div className="income-center">
-              <span className="income-label">本周目标</span>
+              <span className="income-label">完成进度</span>
             </div>
             <div className="income-right">
-              <span className="income-change">+12%</span>
+              <span className="income-change">+{stats.accuracy}%</span>
             </div>
           </div>
         </div>

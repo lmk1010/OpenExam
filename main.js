@@ -1,5 +1,6 @@
-const { app, BrowserWindow, nativeTheme } = require("electron");
+const { app, BrowserWindow, nativeTheme, ipcMain } = require("electron");
 const path = require("path");
+const database = require("./src/main/database.js");
 
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -25,7 +26,6 @@ const createWindow = () => {
     win.loadURL(devServerUrl);
     win.webContents.openDevTools({ mode: "detach" });
 
-    // Dev-only: restart Electron when main/preload changes.
     const { watch } = require("fs");
     let relaunching = false;
     const restart = () => {
@@ -44,6 +44,10 @@ const createWindow = () => {
 
 app.whenReady().then(() => {
   nativeTheme.themeSource = "light";
+
+  // 初始化数据库
+  database.initDatabase();
+
   createWindow();
 
   app.on("activate", () => {
@@ -53,7 +57,35 @@ app.whenReady().then(() => {
   });
 });
 
+// IPC 处理器 - 数据库操作
+ipcMain.handle("db:getPapers", () => {
+  return database.getPapers();
+});
+
+ipcMain.handle("db:getQuestions", (event, paperId) => {
+  return database.getQuestionsByPaperId(paperId);
+});
+
+ipcMain.handle("db:savePracticeRecord", (event, record) => {
+  database.savePracticeRecord(record);
+  return true;
+});
+
+ipcMain.handle("db:getPracticeRecords", () => {
+  return database.getPracticeRecords();
+});
+
+ipcMain.handle("db:addWrongQuestion", (event, { questionId, paperId, userAnswer, correctAnswer }) => {
+  database.addWrongQuestion(questionId, paperId, userAnswer, correctAnswer);
+  return true;
+});
+
+ipcMain.handle("db:getWrongQuestions", () => {
+  return database.getWrongQuestions();
+});
+
 app.on("window-all-closed", () => {
+  database.closeDatabase();
   if (process.platform !== "darwin") {
     app.quit();
   }

@@ -344,65 +344,13 @@ function OriginalHomePage({ ChartLines }) {
       <aside className="side-panel">
         <div className="side-section">
           <div className="side-section-title">
-            <h4>今日推荐</h4>
-            <span className="info-dot" />
-          </div>
-          <div className="side-card preview-card">
-            <div className="preview">
-              <div className="preview-shot" />
-              <div className="preview-meta">
-                <span>2025国考行测真题精选</span>
-              </div>
-            </div>
-          </div>
-          <a className="side-link">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-            </svg>
-            公考资讯平台
-          </a>
-
-          <div className="side-card list">
-            <div className="list-item">
-              <div className="list-icon news">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-              </div>
-              <div>
-                <span>公考动态</span>
-                <strong>2025国考报名</strong>
-              </div>
-            </div>
-            <div className="list-item">
-              <div className="list-icon policy">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
-              </div>
-              <div>
-                <span>政策解读</span>
-                <strong>省考新政策</strong>
-              </div>
-            </div>
-            <div className="list-item">
-              <div className="list-icon tips">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>
-              </div>
-              <div>
-                <span>备考技巧</span>
-                <strong>行测高分秘籍</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="side-section">
-          <div className="side-section-title">
             <h4>热门题库</h4>
             <span className="info-dot" />
           </div>
           <div className="side-card list">
-            {categories.slice(0, 3).map(cat => (
+            {categories.map(cat => (
               <div key={cat.category} className="list-item">
-                <div className={`list-icon ${cat.category === 'yanyu' ? 'exam' : cat.category === 'shuliang' ? 'math' : 'logic'}`}>
+                <div className={`list-icon ${cat.category === 'yanyu' ? 'exam' : cat.category === 'shuliang' ? 'math' : cat.category === 'panduan' ? 'logic' : cat.category === 'ziliao' ? 'policy' : 'tips'}`}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z"/></svg>
                 </div>
                 <div>
@@ -430,6 +378,42 @@ function OriginalHomePage({ ChartLines }) {
             </div>
             <div className="income-right">
               <span className="income-change">+{stats.accuracy}%</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="side-section">
+          <div className="side-section-title">
+            <h4>最近练习</h4>
+            <span className="info-dot" />
+          </div>
+          <div className="side-card list">
+            <div className="list-item">
+              <div className="list-icon news">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+              </div>
+              <div>
+                <span>今日已练</span>
+                <strong>{stats.totalDone}题</strong>
+              </div>
+            </div>
+            <div className="list-item">
+              <div className="list-icon tips">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+              </div>
+              <div>
+                <span>正确数</span>
+                <strong>{stats.correctCount}题</strong>
+              </div>
+            </div>
+            <div className="list-item">
+              <div className="list-icon policy">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+              </div>
+              <div>
+                <span>错题数</span>
+                <strong>{stats.wrongCount}题</strong>
+              </div>
             </div>
           </div>
         </div>

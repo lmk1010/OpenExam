@@ -536,6 +536,13 @@ button {
   box-shadow: 0 8px 24px rgba(17, 24, 39, 0.12);
   font-size: 11px;
   color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.chart-marker:hover .tooltip {
+  opacity: 1;
 }
 
 .tooltip strong {
@@ -829,11 +836,10 @@ button {
   padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   height: 100%;
-  overflow: hidden;
-  justify-content: space-between;
+  overflow-y: auto;
 }
 
 .side-card {
@@ -937,8 +943,8 @@ button {
 .list-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 6px;
+  gap: 8px;
+  padding: 6px 4px;
   border-radius: 6px;
 }
 
@@ -949,22 +955,22 @@ button {
 .list-item > div:last-child {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .list-item span {
-  font-size: 12px;
+  font-size: 10px;
   color: var(--muted);
 }
 
 .list-item strong {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
 }
 
 .list-icon {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: grid;
   place-items: center;

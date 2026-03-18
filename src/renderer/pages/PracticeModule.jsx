@@ -9,6 +9,46 @@ const categoryConfig = {
   changshi: { name: '常识判断', color: '#10b981' },
 };
 
+// 默认子分类配置
+const defaultSubCategories = {
+  yanyu: ['xuanci', 'yueduan', 'yuju', 'wenzhang'],
+  shuliang: ['jisuan', 'tuili'],
+  panduan: ['tuxing', 'dingyi', 'leibi', 'luoji'],
+  ziliao: ['wenzi', 'biaoge', 'tubiao', 'zonghe'],
+  changshi: ['zhengzhi', 'jingji', 'falv', 'keji', 'renwen', 'dili'],
+};
+
+// 子分类中文映射
+const subCategoryNames = {
+  // 言语理解
+  xuanci: '选词填空',
+  yueduan: '片段阅读',
+  yuju: '语句表达',
+  wenzhang: '文章阅读',
+  // 数量关系
+  jisuan: '数学运算',
+  tuili: '数字推理',
+  // 判断推理
+  tuxing: '图形推理',
+  dingyi: '定义判断',
+  leibi: '类比推理',
+  luoji: '逻辑判断',
+  // 资料分析
+  wenzi: '文字资料',
+  biaoge: '表格资料',
+  tubiao: '图形资料',
+  zonghe: '综合资料',
+  zengzhang: '增长率',
+  // 常识判断
+  zhengzhi: '政治',
+  jingji: '经济',
+  falv: '法律',
+  keji: '科技',
+  renwen: '人文',
+  dili: '地理',
+  gongcheng: '工程问题',
+};
+
 // 简约图标组件
 const Icons = {
   yanyu: () => (
@@ -51,17 +91,34 @@ const Icons = {
 // 检查是否在 Electron 环境
 const isElectron = () => window.openexam?.db;
 
-export default function PracticeModule({ onStartPractice }) {
+export default function PracticeModule({ onStartPractice, onImport, onHistory }) {
   const [expandedId, setExpandedId] = useState(null);
   const [modules, setModules] = useState([]);
   const [stats, setStats] = useState({ totalQuestions: 0, totalDone: 0, accuracy: 0, wrongCount: 0 });
   const [subCategories, setSubCategories] = useState({});
   const [loading, setLoading] = useState(true);
+  const [showConfig, setShowConfig] = useState(false);
+  const [practiceConfig, setPracticeConfig] = useState({
+    questionCount: 10,
+    mode: 'practice', // practice | memorize
+    shuffle: true,
+    showAnswer: false, // 背题模式下立即显示答案
+  });
+  const [pendingPractice, setPendingPractice] = useState(null); // { category, subCategory }
 
   // 加载数据
   useEffect(() => {
     const loadData = async () => {
       if (!isElectron()) {
+        // 非 Electron 环境，显示所有默认分类
+        const defaultModules = Object.entries(categoryConfig).map(([id, cfg]) => ({
+          id,
+          name: cfg.name,
+          color: cfg.color,
+          count: 0,
+          done: 0
+        }));
+        setModules(defaultModules);
         setLoading(false);
         return;
       }
@@ -71,14 +128,17 @@ export default function PracticeModule({ onStartPractice }) {
         const categoryStats = await window.openexam.db.getCategoryStats();
         const practiceStats = await window.openexam.db.getPracticeStats();
 
-        // 转换为模块数据
-        const moduleData = categoryStats.map(cat => ({
-          id: cat.category,
-          name: categoryConfig[cat.category]?.name || cat.category,
-          color: categoryConfig[cat.category]?.color || '#6b7280',
-          count: cat.total,
-          done: cat.done
-        }));
+        // 合并默认分类和数据库统计，确保所有分类都显示
+        const moduleData = Object.entries(categoryConfig).map(([id, cfg]) => {
+          const dbStat = categoryStats.find(cat => cat.category === id);
+          return {
+            id,
+            name: cfg.name,
+            color: cfg.color,
+            count: dbStat?.total || 0,
+            done: dbStat?.done || 0
+          };
+        });
 
         setModules(moduleData);
         setStats(practiceStats);
@@ -93,14 +153,53 @@ export default function PracticeModule({ onStartPractice }) {
 
   // 加载子分类
   const loadSubCategories = async (category) => {
-    if (subCategories[category] || !isElectron()) return;
+    if (subCategories[category]) return;
+
+    // 获取默认子分类
+    const defaultSubs = defaultSubCategories[category] || [];
+
+    if (!isElectron()) {
+      // 非 Electron 环境，显示默认子分类
+      const subs = defaultSubs.map(sub => ({ subCategory: sub, count: 0 }));
+      setSubCategories(prev => ({ ...prev, [category]: subs }));
+      return;
+    }
 
     try {
-      const subs = await window.openexam.db.getSubCategoryStats(category);
-      setSubCategories(prev => ({ ...prev, [category]: subs }));
+      const dbSubs = await window.openexam.db.getSubCategoryStats(category);
+
+      // 合并默认子分类和数据库统计
+      const mergedSubs = defaultSubs.map(sub => {
+        const dbSub = dbSubs.find(s => s.subCategory === sub);
+        return { subCategory: sub, count: dbSub?.count || 0 };
+      });
+
+      // 添加数据库中有但默认列表没有的子分类
+      dbSubs.forEach(dbSub => {
+        if (!defaultSubs.includes(dbSub.subCategory) && dbSub.subCategory) {
+          mergedSubs.push(dbSub);
+        }
+      });
+
+      setSubCategories(prev => ({ ...prev, [category]: mergedSubs }));
     } catch (err) {
       console.error('加载子分类失败:', err);
     }
+  };
+
+  // 开始练习（直接开始）
+  const handleStartPractice = (category, subCategory) => {
+    onStartPractice?.(category, subCategory, practiceConfig);
+  };
+
+  // 打开配置弹窗
+  const openConfig = () => {
+    setShowConfig(true);
+  };
+
+  // 保存配置
+  const saveConfig = () => {
+    setShowConfig(false);
   };
 
   const handleExpand = (id) => {
@@ -142,6 +241,26 @@ export default function PracticeModule({ onStartPractice }) {
           <span className="summary-value">{stats.accuracy}%</span>
           <span className="summary-label">正确率</span>
         </div>
+        <div className="summary-actions">
+          <button className="summary-btn outline" onClick={openConfig}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            练习设置
+          </button>
+          <button className="summary-btn outline" onClick={() => onHistory?.()}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            练习历史
+          </button>
+          <button className="summary-btn" onClick={() => onImport?.()}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            导入试卷
+          </button>
+        </div>
       </div>
 
       {/* 模块列表 */}
@@ -177,6 +296,13 @@ export default function PracticeModule({ onStartPractice }) {
                     </div>
                     <span className="progress-text">{progress}%</span>
                   </div>
+                  <button
+                    className="practice-start-btn"
+                    onClick={(e) => { e.stopPropagation(); handleStartPractice(mod.id, 'all'); }}
+                    disabled={mod.count === 0}
+                  >
+                    开始
+                  </button>
                   <div className={`practice-arrow ${isExpanded ? 'rotated' : ''}`}>
                     <Icons.arrow />
                   </div>
@@ -185,13 +311,13 @@ export default function PracticeModule({ onStartPractice }) {
                 {isExpanded && (
                   <div className="practice-subs">
                     {subs.map(sub => (
-                      <button key={sub.subCategory} className="sub-item" onClick={() => onStartPractice?.(mod.id, sub.subCategory)}>
-                        <span className="sub-name">{sub.subCategory || '未分类'}</span>
+                      <button key={sub.subCategory} className="sub-item" onClick={() => handleStartPractice(mod.id, sub.subCategory)} disabled={sub.count === 0}>
+                        <span className="sub-name">{subCategoryNames[sub.subCategory] || sub.subCategory || '未分类'}</span>
                         <span className="sub-count">{sub.count} 题</span>
                         <Icons.arrow />
                       </button>
                     ))}
-                    <button className="sub-item primary" onClick={() => onStartPractice?.(mod.id, 'all')}>
+                    <button className="sub-item primary" onClick={() => handleStartPractice(mod.id, 'all')} disabled={mod.count === 0}>
                       <span className="sub-name">全部练习</span>
                       <span className="sub-count">{mod.count} 题</span>
                       <Icons.arrow />
@@ -203,6 +329,77 @@ export default function PracticeModule({ onStartPractice }) {
           })
         )}
       </div>
+
+      {/* 练习配置弹窗 */}
+      {showConfig && (
+        <div className="config-overlay" onClick={() => setShowConfig(false)}>
+          <div className="config-modal" onClick={e => e.stopPropagation()}>
+            <h3>练习设置</h3>
+
+            <div className="config-group">
+              <label>练习模式</label>
+              <div className="config-options">
+                <button
+                  className={`config-option ${practiceConfig.mode === 'practice' ? 'active' : ''}`}
+                  onClick={() => setPracticeConfig(prev => ({ ...prev, mode: 'practice', showAnswer: false }))}
+                >
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                  <span className="option-label">做题模式</span>
+                  <span className="option-desc">选择答案后显示对错</span>
+                </button>
+                <button
+                  className={`config-option ${practiceConfig.mode === 'memorize' ? 'active' : ''}`}
+                  onClick={() => setPracticeConfig(prev => ({ ...prev, mode: 'memorize', showAnswer: true }))}
+                >
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                  </svg>
+                  <span className="option-label">背题模式</span>
+                  <span className="option-desc">直接显示答案和解析</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="config-group">
+              <label>每次练习题数</label>
+              <div className="config-counts">
+                {[5, 10, 15, 20, 30, 50].map(num => (
+                  <button
+                    key={num}
+                    className={`count-btn ${practiceConfig.questionCount === num ? 'active' : ''}`}
+                    onClick={() => setPracticeConfig(prev => ({ ...prev, questionCount: num }))}
+                  >
+                    {num}题
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="config-group">
+              <label>其他设置</label>
+              <div className="config-toggles">
+                <label className="toggle-item">
+                  <input
+                    type="checkbox"
+                    checked={practiceConfig.shuffle}
+                    onChange={e => setPracticeConfig(prev => ({ ...prev, shuffle: e.target.checked }))}
+                  />
+                  <span>随机打乱题目顺序</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="config-actions">
+              <button className="btn-secondary" onClick={() => setShowConfig(false)}>取消</button>
+              <button className="btn-primary" onClick={saveConfig}>保存设置</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

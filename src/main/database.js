@@ -42,13 +42,16 @@ function initDatabase() {
       analysis TEXT,
       difficulty INTEGER DEFAULT 2,
       tags TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (paper_id) REFERENCES papers(id)
     );
 
     -- 练习记录表
     CREATE TABLE IF NOT EXISTS practice_records (
       id TEXT PRIMARY KEY,
-      paper_id TEXT NOT NULL,
+      paper_id TEXT,
+      category TEXT,
+      sub_category TEXT,
       start_time TEXT NOT NULL,
       end_time TEXT,
       duration INTEGER,
@@ -56,8 +59,9 @@ function initDatabase() {
       answers TEXT,
       correct_count INTEGER DEFAULT 0,
       total_count INTEGER DEFAULT 0,
+      accuracy INTEGER DEFAULT 0,
       score INTEGER DEFAULT 0,
-      FOREIGN KEY (paper_id) REFERENCES papers(id)
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
     -- 错题本
@@ -173,20 +177,23 @@ function getQuestionsByPaperId(paperId) {
 function savePracticeRecord(record) {
   const stmt = db.prepare(`
     INSERT OR REPLACE INTO practice_records
-    (id, paper_id, start_time, end_time, duration, status, answers, correct_count, total_count, score)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (id, paper_id, category, sub_category, start_time, end_time, duration, status, answers, correct_count, total_count, accuracy, score)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   stmt.run(
     record.id,
-    record.paperId,
+    record.paperId || null,
+    record.category || null,
+    record.subCategory || null,
     record.startTime,
     record.endTime,
     record.duration,
     record.status,
-    JSON.stringify(record.answers),
+    JSON.stringify(record.answers || {}),
     record.correctCount,
     record.totalCount,
-    record.score
+    record.accuracy || 0,
+    record.score || 0
   );
 }
 
@@ -281,15 +288,118 @@ function getPracticeStats() {
 
   const wrongCount = db.prepare('SELECT COUNT(*) as count FROM wrong_questions').get().count;
 
+  // 今日新增题目数 - 检查列是否存在
+  let todayAdded = 0;
+  try {
+    todayAdded = db.prepare(`
+      SELECT COUNT(*) as count FROM questions
+      WHERE DATE(created_at) = DATE('now')
+    `).get().count;
+  } catch (e) {
+    // created_at 列不存在，返回 0
+  }
+
   return {
     totalQuestions,
     totalDone: completedRecords.total || 0,
     correctCount: completedRecords.correct || 0,
     wrongCount,
+    todayAdded,
     accuracy: completedRecords.total > 0
       ? Math.round((completedRecords.correct / completedRecords.total) * 100)
       : 0
   };
+}
+
+// 导入试卷和题目
+function importPaper(paperData, questions) {
+  const paperId = `paper_${Date.now()}`;
+
+  const insertPaper = db.prepare(`
+    INSERT INTO papers (id, title, year, type, subject, province, question_count, duration, difficulty, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `);
+
+  const insertQuestion = db.prepare(`
+    INSERT INTO questions (id, paper_id, order_num, type, category, sub_category, content, options, answer, analysis, difficulty, tags, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `);
+
+  const importTransaction = db.transaction(() => {
+    // 插入试卷
+    insertPaper.run(
+      paperId,
+      paperData.title || '导入试卷',
+      paperData.year || new Date().getFullYear(),
+      'imported',
+      'xingce',
+      null,
+      questions.length,
+      120,
+      3
+    );
+
+    // 插入题目
+    questions.forEach((q, index) => {
+      const questionId = `q_${Date.now()}_${index}`;
+      insertQuestion.run(
+        questionId,
+        paperId,
+        index + 1,
+        'single',
+        q.category || 'yanyu',
+        q.subCategory || '',
+        q.content,
+        JSON.stringify(q.options),
+        q.answer,
+        q.analysis || '',
+        2,
+        ''
+      );
+    });
+  });
+
+  importTransaction();
+
+  return { paperId, questionCount: questions.length };
+}
+
+// 获取导入的试卷列表
+function getImportedPapers() {
+  return db.prepare(`
+    SELECT * FROM papers
+    WHERE type = 'imported'
+    ORDER BY created_at DESC
+  `).all();
+}
+
+// 按分类获取题目（用于专项练习）
+function getQuestionsByCategory(category, subCategory, limit, shuffle) {
+  let sql = `SELECT * FROM questions WHERE category = ?`;
+  const params = [category];
+
+  if (subCategory && subCategory !== 'all') {
+    sql += ` AND sub_category = ?`;
+    params.push(subCategory);
+  }
+
+  if (shuffle) {
+    sql += ` ORDER BY RANDOM()`;
+  } else {
+    sql += ` ORDER BY paper_id, order_num`;
+  }
+
+  if (limit && limit > 0) {
+    sql += ` LIMIT ?`;
+    params.push(limit);
+  }
+
+  const rows = db.prepare(sql).all(...params);
+  return rows.map(row => ({
+    ...row,
+    options: JSON.parse(row.options),
+    tags: row.tags ? row.tags.split(',') : []
+  }));
 }
 
 // 关闭数据库
@@ -310,5 +420,8 @@ module.exports = {
   getCategoryStats,
   getSubCategoryStats,
   getPracticeStats,
+  importPaper,
+  getImportedPapers,
+  getQuestionsByCategory,
   closeDatabase
 };

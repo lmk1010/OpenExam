@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from "react";
 import PaperList from "./pages/PaperList.jsx";
 import PracticeModule from "./pages/PracticeModule.jsx";
+import PracticeHistory from "./pages/PracticeHistory.jsx";
 import ExamRoom from "./pages/ExamRoom.jsx";
 import ExamResult from "./pages/ExamResult.jsx";
+import ImportPaper from "./pages/ImportPaper.jsx";
+import Settings from "./pages/Settings.jsx";
 import { actions, getState } from "./store/examStore.js";
 
 const ChartLines = () => (
@@ -37,6 +40,8 @@ export default function App() {
   const [currentPaperId, setCurrentPaperId] = useState(null);
   const [examResult, setExamResult] = useState(null);
   const [activeTab, setActiveTab] = useState("学习中心");
+  const [practiceQuestions, setPracticeQuestions] = useState(null); // 专项练习题目
+  const [practiceConfig, setPracticeConfig] = useState(null); // 练习配置
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -45,8 +50,8 @@ export default function App() {
     }
   }, [theme]);
 
-  const handleStartExam = (paperId) => {
-    actions.startExam(paperId);
+  const handleStartExam = async (paperId) => {
+    await actions.startExam(paperId);
     setCurrentPaperId(paperId);
     setPage("exam");
   };
@@ -54,6 +59,37 @@ export default function App() {
   const handleFinishExam = (result) => {
     setExamResult(result);
     setPage("result");
+  };
+
+  // 开始专项练习
+  const handleStartPractice = async (category, subCategory, config) => {
+    console.log('开始练习:', category, subCategory, config);
+
+    if (!window.openexam?.db) {
+      alert('数据库未连接');
+      return;
+    }
+
+    try {
+      const questions = await window.openexam.db.getQuestionsByCategory(
+        category,
+        subCategory,
+        config?.questionCount || 10,
+        config?.shuffle !== false
+      );
+
+      if (questions.length === 0) {
+        alert('该分类暂无题目');
+        return;
+      }
+
+      setPracticeQuestions(questions);
+      setPracticeConfig({ ...config, category, subCategory });
+      setPage("practice-exam");
+    } catch (err) {
+      console.error('加载题目失败:', err);
+      alert('加载题目失败');
+    }
   };
 
   const handleExitExam = () => {
@@ -85,6 +121,26 @@ export default function App() {
     return (
       <div className={`app theme-${theme}`}>
         <ExamRoom paperId={currentPaperId} onFinish={handleFinishExam} onExit={handleExitExam} />
+      </div>
+    );
+  }
+
+  // 专项练习模式
+  if (page === "practice-exam" && practiceQuestions) {
+    return (
+      <div className={`app theme-${theme}`}>
+        <ExamRoom
+          questions={practiceQuestions}
+          config={practiceConfig}
+          onFinish={handleFinishExam}
+          onExit={() => {
+            if (confirm("确定退出吗？当前答题进度将丢失。")) {
+              setPracticeQuestions(null);
+              setPracticeConfig(null);
+              setPage("practice");
+            }
+          }}
+        />
       </div>
     );
   }
@@ -172,6 +228,11 @@ export default function App() {
                 <button className="theme-toggle" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
                   {theme === "light" ? "☾" : "☀"}
                 </button>
+                <button className="settings-btn" onClick={() => setPage("settings")}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                </button>
               </div>
             </div>
           </header>
@@ -180,7 +241,16 @@ export default function App() {
             {page === "papers" ? (
               <PaperList onStartExam={handleStartExam} />
             ) : page === "practice" ? (
-              <PracticeModule />
+              <PracticeModule onImport={() => setPage("import")} onStartPractice={handleStartPractice} onHistory={() => setPage("history")} />
+            ) : page === "history" ? (
+              <PracticeHistory onBack={() => setPage("practice")} />
+            ) : page === "import" ? (
+              <ImportPaper
+                onBack={() => setPage("practice")}
+                onImportComplete={(data) => { console.log('导入数据:', data); setPage("practice"); }}
+              />
+            ) : page === "settings" ? (
+              <Settings onBack={() => setPage("home")} />
             ) : (
               <OriginalHomePage ChartLines={ChartLines} />
             )}
@@ -193,7 +263,7 @@ export default function App() {
 
 // 原始主页组件
 function OriginalHomePage({ ChartLines }) {
-  const [stats, setStats] = useState({ totalQuestions: 0, totalDone: 0, accuracy: 0, wrongCount: 0, correctCount: 0 });
+  const [stats, setStats] = useState({ totalQuestions: 0, totalDone: 0, accuracy: 0, wrongCount: 0, correctCount: 0, todayAdded: 0 });
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
@@ -388,6 +458,15 @@ function OriginalHomePage({ ChartLines }) {
             <span className="info-dot" />
           </div>
           <div className="side-card list">
+            <div className="list-item">
+              <div className="list-icon exam">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+              </div>
+              <div>
+                <span>今日新增</span>
+                <strong>{stats.todayAdded || 0}题</strong>
+              </div>
+            </div>
             <div className="list-item">
               <div className="list-icon news">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>

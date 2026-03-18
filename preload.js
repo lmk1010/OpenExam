@@ -17,6 +17,17 @@ contextBridge.exposeInMainWorld("openexam", {
     getWrongQuestions: () => ipcRenderer.invoke("db:getWrongQuestions"),
     getCategoryStats: () => ipcRenderer.invoke("db:getCategoryStats"),
     getSubCategoryStats: (category) => ipcRenderer.invoke("db:getSubCategoryStats", category),
-    getPracticeStats: () => ipcRenderer.invoke("db:getPracticeStats")
+    getPracticeStats: () => ipcRenderer.invoke("db:getPracticeStats"),
+    importPaper: (paperData, questions) => ipcRenderer.invoke("db:importPaper", { paperData, questions }),
+    getImportedPapers: () => ipcRenderer.invoke("db:getImportedPapers"),
+    getQuestionsByCategory: (category, subCategory, limit, shuffle) =>
+      ipcRenderer.invoke("db:getQuestionsByCategory", { category, subCategory, limit, shuffle })
+  },
+
+  // AI API
+  ai: {
+    testConnection: (settings) => ipcRenderer.invoke("ai:testConnection", settings),
+    recognizeQuestions: (settings, imageBase64, mimeType) =>
+      ipcRenderer.invoke("ai:recognizeQuestions", { settings, imageBase64, mimeType })
   }
 });

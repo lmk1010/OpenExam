@@ -96,6 +96,29 @@ ipcMain.handle("db:getPracticeStats", () => {
   return database.getPracticeStats();
 });
 
+ipcMain.handle("db:importPaper", (event, { paperData, questions }) => {
+  return database.importPaper(paperData, questions);
+});
+
+ipcMain.handle("db:getImportedPapers", () => {
+  return database.getImportedPapers();
+});
+
+ipcMain.handle("db:getQuestionsByCategory", (event, { category, subCategory, limit, shuffle }) => {
+  return database.getQuestionsByCategory(category, subCategory, limit, shuffle);
+});
+
+// AI 相关 IPC 处理器
+const aiService = require("./src/main/ai/index.js");
+
+ipcMain.handle("ai:testConnection", async (event, settings) => {
+  return aiService.testConnection(settings);
+});
+
+ipcMain.handle("ai:recognizeQuestions", async (event, { settings, imageBase64, mimeType }) => {
+  return aiService.recognizeQuestions(settings, imageBase64, mimeType);
+});
+
 app.on("window-all-closed", () => {
   database.closeDatabase();
   if (process.platform !== "darwin") {

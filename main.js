@@ -26,6 +26,13 @@ const createWindow = () => {
     win.loadURL(devServerUrl);
     win.webContents.openDevTools({ mode: "detach" });
 
+    // Forward renderer console errors to terminal
+    win.webContents.on('console-message', (event, level, message, line, sourceId) => {
+      if (level >= 2) { // warnings and errors
+        console.error(`[Renderer] ${message}`);
+      }
+    });
+
     const { watch } = require("fs");
     let relaunching = false;
     const restart = () => {
@@ -117,6 +124,14 @@ ipcMain.handle("ai:testConnection", async (event, settings) => {
 
 ipcMain.handle("ai:recognizeQuestions", async (event, { settings, imageBase64, mimeType }) => {
   return aiService.recognizeQuestions(settings, imageBase64, mimeType);
+});
+
+ipcMain.handle("ai:chat", async (event, { settings, messages }) => {
+  return aiService.chat(settings, messages);
+});
+
+ipcMain.handle("ai:generatePaper", async (event, { settings, config }) => {
+  return aiService.generatePaper(settings, config);
 });
 
 app.on("window-all-closed", () => {

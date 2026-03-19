@@ -28,6 +28,10 @@ contextBridge.exposeInMainWorld("openexam", {
   ai: {
     testConnection: (settings) => ipcRenderer.invoke("ai:testConnection", settings),
     recognizeQuestions: (settings, imageBase64, mimeType) =>
-      ipcRenderer.invoke("ai:recognizeQuestions", { settings, imageBase64, mimeType })
+      ipcRenderer.invoke("ai:recognizeQuestions", { settings, imageBase64, mimeType }),
+    chat: (settings, messages) =>
+      ipcRenderer.invoke("ai:chat", { settings, messages }),
+    generatePaper: (settings, config) =>
+      ipcRenderer.invoke("ai:generatePaper", { settings, config }),
   }
 });

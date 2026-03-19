@@ -4566,3 +4566,248 @@ button {
   font-size: 11px;
   color: var(--muted);
 }
+
+/* ==========================================
+   v2.0 Additions — New Module Styles
+   ========================================== */
+
+/* Rail icons — flat line style overrides */
+.rail-icon {
+  background: var(--surface-soft) !important;
+  color: var(--muted) !important;
+  box-shadow: none !important;
+  border: 1px solid var(--line);
+  transition: all 0.15s ease;
+}
+
+.rail-icon:hover {
+  color: var(--accent) !important;
+  border-color: var(--accent-soft);
+  background: var(--surface) !important;
+}
+
+.rail-icon.active {
+  color: var(--accent) !important;
+  border-color: var(--accent);
+  background: var(--surface) !important;
+  box-shadow: 0 4px 8px rgba(109, 94, 251, 0.12) !important;
+}
+
+/* AI Teacher Chat Page */
+.ai-teacher-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  grid-column: 1 / -1;  /* take full workspace-body width */
+}
+
+/* Full-width pages in workspace-body grid */
+/* When a page is the only child (no side-panel), span full width */
+.workspace-body > :only-child {
+  grid-column: 1 / -1;
+}
+
+.ai-teacher-page,
+.settings-page,
+.paper-list-page,
+.practice-module-page,
+.import-paper-page,
+.practice-history-page {
+  grid-column: 1 / -1;
+}
+
+/* New module pages — compact card appearance */
+.module-page .info-card {
+  background: var(--surface-soft);
+  border-radius: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+}
+
+.module-page .info-header h4 {
+  font-size: 12px;
+}
+
+.module-page .bottom-row {
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.module-page .chart-card {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.module-page .breadcrumb {
+  margin-top: 8px;
+}
+
+.module-page .brand-row {
+  margin-top: 2px;
+}
+
+.module-page .brand-row h2 {
+  font-size: 16px;
+}
+
+.ai-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ai-chat-msg {
+  display: flex;
+  gap: 10px;
+  max-width: 75%;
+  animation: aiMsgIn 0.3s ease;
+}
+
+@keyframes aiMsgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ai-chat-msg.user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.ai-chat-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  flex-shrink: 0;
+  background: var(--surface-soft);
+}
+
+.ai-chat-bubble {
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.ai-chat-msg.assistant .ai-chat-bubble {
+  background: var(--surface-soft);
+  color: var(--text);
+  border-top-left-radius: 4px;
+}
+
+.ai-chat-msg.user .ai-chat-bubble {
+  background: var(--accent);
+  color: #fff;
+  border-top-right-radius: 4px;
+}
+
+.ai-typing {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.ai-typing::after {
+  content: '...';
+  animation: dots 1.2s infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60%, 100% { content: '...'; }
+}
+
+.ai-chat-input-area {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.ai-quick-btns {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.ai-quick-btns .chip {
+  font-size: 12px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.ai-quick-btns .chip:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.ai-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.ai-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  resize: none;
+  min-height: 40px;
+  max-height: 120px;
+  transition: border-color 0.15s;
+}
+
+.ai-input:focus {
+  border-color: var(--accent);
+}
+
+.ai-send-btn {
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+.ai-send-btn:hover {
+  opacity: 0.9;
+}
+
+.ai-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Settings button in header */
+.settings-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+}
+
+.settings-btn:hover {
+  color: var(--accent);
+}

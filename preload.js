@@ -21,7 +21,12 @@ contextBridge.exposeInMainWorld("openexam", {
     importPaper: (paperData, questions) => ipcRenderer.invoke("db:importPaper", { paperData, questions }),
     getImportedPapers: () => ipcRenderer.invoke("db:getImportedPapers"),
     getQuestionsByCategory: (category, subCategory, limit, shuffle) =>
-      ipcRenderer.invoke("db:getQuestionsByCategory", { category, subCategory, limit, shuffle })
+      ipcRenderer.invoke("db:getQuestionsByCategory", { category, subCategory, limit, shuffle }),
+    getDailyStats: (days) => ipcRenderer.invoke("db:getDailyStats", days),
+    getStreakDays: () => ipcRenderer.invoke("db:getStreakDays"),
+    getTodayStats: () => ipcRenderer.invoke("db:getTodayStats"),
+    getHeatmapData: (days) => ipcRenderer.invoke("db:getHeatmapData", days),
+    getGrowthData: () => ipcRenderer.invoke("db:getGrowthData"),
   },
 
   // AI API

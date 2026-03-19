@@ -1,20 +1,10 @@
 import React, { useState, useEffect } from 'react';
-
-// 支持的 AI 服务商配置
-const AI_PROVIDERS = [
-  { id: 'openai', name: 'OpenAI', icon: 'openai', baseUrl: 'https://api.openai.com/v1', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'], supportsVision: true },
-  { id: 'anthropic', name: 'Claude', icon: 'claude', baseUrl: 'https://api.anthropic.com/v1', models: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022'], supportsVision: true },
-  { id: 'deepseek', name: 'DeepSeek', icon: 'deepseek', baseUrl: 'https://api.deepseek.com/v1', models: ['deepseek-chat', 'deepseek-reasoner'], supportsVision: false },
-  { id: 'doubao', name: '豆包', icon: 'doubao', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', models: ['doubao-1-5-vision-pro-32k', 'doubao-1-5-pro-32k'], supportsVision: true },
-  { id: 'kimi', name: 'Kimi', icon: 'kimi', baseUrl: 'https://api.moonshot.cn/v1', models: ['moonshot-v1-128k', 'moonshot-v1-32k'], supportsVision: true },
-  { id: 'qwen', name: '通义千问', icon: 'qwen', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', models: ['qwen-vl-max', 'qwen-vl-plus', 'qwen-turbo'], supportsVision: true },
-  { id: 'glm', name: '智谱GLM', icon: 'glm', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-4v', 'glm-4'], supportsVision: true },
-  { id: 'custom', name: '自定义', icon: 'custom', baseUrl: '', models: [], supportsVision: true },
-];
+import { AI_PROVIDERS, DEFAULT_AI_SETTINGS, getAIProvider, normalizeAISettings } from '../store/aiSettings.js';
 
 const ProviderIcon = ({ type }) => {
   const icons = {
     openai: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22.28 9.37a5.5 5.5 0 0 0-.47-4.5 5.56 5.56 0 0 0-6-2.57 5.5 5.5 0 0 0-4.14-1.86 5.56 5.56 0 0 0-5.3 3.85 5.5 5.5 0 0 0-3.68 2.67 5.56 5.56 0 0 0 .68 6.52 5.5 5.5 0 0 0 .47 4.5 5.56 5.56 0 0 0 6 2.57 5.5 5.5 0 0 0 4.14 1.86 5.56 5.56 0 0 0 5.3-3.85 5.5 5.5 0 0 0 3.68-2.67 5.56 5.56 0 0 0-.68-6.52z"/></svg>,
+    minimax: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M5 5h4l3 4 3-4h4v14h-4V11l-3 4-3-4v8H5z"/></svg>,
     claude: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-6h2v6zm4 0h-2v-6h2v6zm0-8h-6V7h6v2z"/></svg>,
     deepseek: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>,
     doubao: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>,
@@ -27,7 +17,7 @@ const ProviderIcon = ({ type }) => {
 };
 
 export default function Settings({ onBack }) {
-  const [settings, setSettings] = useState({ aiProvider: '', apiKey: '', apiBase: '', model: '', customModel: '' });
+  const [settings, setSettings] = useState(DEFAULT_AI_SETTINGS);
   const [showKey, setShowKey] = useState(false);
   const [testStatus, setTestStatus] = useState(null);
   const [activeSection, setActiveSection] = useState('ai');
@@ -35,12 +25,14 @@ export default function Settings({ onBack }) {
   useEffect(() => {
     const saved = localStorage.getItem('openexam_settings');
     if (saved) {
-      try { setSettings(JSON.parse(saved)); } catch (e) {}
+      try { setSettings(normalizeAISettings(JSON.parse(saved))); } catch (e) {}
     }
   }, []);
 
   const handleSave = () => {
-    localStorage.setItem('openexam_settings', JSON.stringify(settings));
+    const normalized = normalizeAISettings(settings);
+    setSettings(normalized);
+    localStorage.setItem('openexam_settings', JSON.stringify(normalized));
     setTestStatus('saved');
     setTimeout(() => setTestStatus(null), 2000);
   };
@@ -64,11 +56,18 @@ export default function Settings({ onBack }) {
   };
 
   const handleProviderChange = (providerId) => {
-    const provider = AI_PROVIDERS.find(p => p.id === providerId);
-    setSettings(prev => ({ ...prev, aiProvider: providerId, apiBase: provider?.baseUrl || '', model: provider?.models[0] || '' }));
+    const provider = getAIProvider(providerId);
+    setSettings(prev => normalizeAISettings({
+      ...prev,
+      aiProvider: providerId,
+      apiBase: provider?.baseUrl || '',
+      model: provider?.models?.[0] || prev.model || '',
+      customModel: providerId === 'custom' ? prev.customModel : '',
+      apiFormat: provider?.defaultFormat || prev.apiFormat,
+    }));
   };
 
-  const currentProvider = AI_PROVIDERS.find(p => p.id === settings.aiProvider);
+  const currentProvider = getAIProvider(settings.aiProvider);
 
   const navItems = [
     { id: 'ai', label: 'AI 模型', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/></svg> },
@@ -166,6 +165,23 @@ export default function Settings({ onBack }) {
                     />
                   </div>
 
+                  {currentProvider?.sdkType !== 'anthropic' && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)" }}>接口格式</label>
+                      <select
+                        value={settings.apiFormat}
+                        onChange={(e) => setSettings(prev => normalizeAISettings({ ...prev, apiFormat: e.target.value }))}
+                        style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", fontSize: 13, outline: "none", color: "var(--text)", cursor: "pointer" }}
+                      >
+                        {(currentProvider?.supportedFormats || []).map((format) => (
+                          <option key={format} value={format}>
+                            {format === 'responses' ? 'Responses API' : format === 'chat_completions' ? 'Chat Completions API' : format}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)" }}>模型</label>
                     {settings.aiProvider === 'custom' ? (
@@ -190,6 +206,80 @@ export default function Settings({ onBack }) {
                     <button onClick={handleSave} style={{ flex: 1, padding: "10px 0", borderRadius: 6, border: "1px solid var(--accent)", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 12px rgba(109,94,251,0.2)" }}>
                       {testStatus === 'saved' ? '已保存 ✓' : '保存配置'}
                     </button>
+                  </div>
+
+                  <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px dashed var(--line)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>文档识别引擎</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.7 }}>引擎 A 复用当前 AI 模型；引擎 B 用独立 OCR 服务，适合扫描 PDF 或复杂版式。</div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                      {[
+                        ['auto', '自动选择'],
+                        ['ai', '仅 AI 引擎'],
+                        ['ocr', '仅 OCR 引擎'],
+                      ].map(([key, label]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setSettings(prev => ({ ...prev, recognizeEngine: key }))}
+                          style={{ padding: '10px 12px', borderRadius: 8, border: settings.recognizeEngine === key ? '1px solid var(--accent)' : '1px solid var(--line)', background: settings.recognizeEngine === key ? 'rgba(109,94,251,0.06)' : 'var(--surface)', color: settings.recognizeEngine === key ? 'var(--accent)' : 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>PDF 最大识别页数</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={settings.pdfMaxPages}
+                        onChange={(e) => setSettings(prev => ({ ...prev, pdfMaxPages: e.target.value }))}
+                        style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)', fontSize: 13, outline: 'none', color: 'var(--text)' }}
+                      />
+                    </div>
+
+                    <div style={{ marginTop: 4, padding: '14px', borderRadius: 10, background: 'var(--surface-soft)', border: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>OCR 引擎 B</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.7 }}>可接第三方 OCR URL。建议你的 OCR 服务返回 <code>{'{ questions: [...] }'}</code>，或返回纯文本再交给系统解析。</div>
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text)', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={Boolean(settings.ocrEnabled)} onChange={(e) => setSettings(prev => ({ ...prev, ocrEnabled: e.target.checked }))} />
+                          启用 OCR
+                        </label>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>OCR URL</label>
+                          <input type="text" value={settings.ocrApiUrl} onChange={(e) => setSettings(prev => ({ ...prev, ocrApiUrl: e.target.value }))} placeholder="https://your-ocr.example.com/recognize"
+                            style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)', fontSize: 13, outline: 'none', color: 'var(--text)' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>OCR Key</label>
+                          <input type={showKey ? 'text' : 'password'} value={settings.ocrApiKey} onChange={(e) => setSettings(prev => ({ ...prev, ocrApiKey: e.target.value }))} placeholder="可选"
+                            style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)', fontSize: 13, outline: 'none', color: 'var(--text)' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>OCR 返回格式</label>
+                        <select value={settings.ocrResponseMode} onChange={(e) => setSettings(prev => ({ ...prev, ocrResponseMode: e.target.value }))}
+                          style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)', fontSize: 13, outline: 'none', color: 'var(--text)', cursor: 'pointer' }}
+                        >
+                          <option value="json_questions">返回结构化题目 JSON</option>
+                          <option value="text">返回纯文本，再交给 AI 结构化</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

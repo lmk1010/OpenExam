@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import { getAISettings, isAIConfigured, isOCRConfigured } from '../store/aiSettings.js';
 
 const categoryConfig = {
   yanyu: { name: '言语理解', color: '#3b82f6' },
@@ -93,16 +94,53 @@ export default function ImportPaper({ onBack, onImportComplete }) {
   }, []);
 
   // 检查是否配置了 AI
-  const hasAIConfig = () => {
-    try {
-      const saved = localStorage.getItem('openexam_settings');
-      if (saved) {
-        const settings = JSON.parse(saved);
-        return settings.apiKey && settings.aiProvider;
-      }
-    } catch (e) {}
-    return false;
+  const hasAIConfig = () => isAIConfigured();
+  const hasRecognitionConfig = () => isAIConfigured() || isOCRConfigured();
+
+  const readFileAsBase64 = (targetFile) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.readAsDataURL(targetFile);
+  });
+
+  const renderPdfToImages = async (targetFile, maxPages = 6) => {
+    const [pdfjsLib, workerSrcModule] = await Promise.all([
+      import('pdfjs-dist/build/pdf.mjs'),
+      import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
+    ]);
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrcModule.default;
+
+    const bytes = await targetFile.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+    const pageCount = Math.min(pdf.numPages, Math.max(1, Number(maxPages) || 6));
+    const pages = [];
+
+    for (let pageIndex = 1; pageIndex <= pageCount; pageIndex++) {
+      const page = await pdf.getPage(pageIndex);
+      const viewport = page.getViewport({ scale: 1.8 });
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      await page.render({ canvasContext: context, viewport }).promise;
+      pages.push(canvas.toDataURL('image/png').split(',')[1]);
+    }
+
+    return pages;
   };
+
+  const mergeRecognizedQuestions = (segments = [], fallbackCategory) => segments
+    .flatMap((segment) => segment?.questions || [])
+    .map((question) => ({
+      ...question,
+      category: question.category || fallbackCategory,
+      subCategory: question.subCategory || '',
+    }));
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -259,10 +297,33 @@ export default function ImportPaper({ onBack, onImportComplete }) {
       if (['csv', 'xls', 'xlsx'].includes(ext)) {
         questions = await parseFile(file);
       } else {
-        // PDF/图片需要 AI 识别
-        setParseError('PDF/图片文件需要配置 AI 服务才能解析，请先在设置中配置 AI，或使用模板导入');
-        setParsing(false);
-        return;
+        const settings = getAISettings();
+        const needsAI = settings.recognizeEngine !== 'ocr' || settings.ocrResponseMode === 'text';
+
+        if (needsAI && !hasAIConfig()) {
+          setParseError('当前识别链路仍需要 AI 配置，请先在设置中配置 AI 服务');
+          setParsing(false);
+          return;
+        }
+
+        if (ext === 'pdf') {
+          const pages = await renderPdfToImages(file, settings.pdfMaxPages);
+          const pageResults = [];
+          const pageSettings = settings.recognizeEngine === 'auto' && settings.ocrEnabled
+            ? { ...settings, recognizeEngine: 'ocr' }
+            : settings;
+          for (const pageImageBase64 of pages) {
+            const result = await window.openexam.ai.recognizeQuestions(pageSettings, pageImageBase64, 'image/png');
+            if (result?.error) throw new Error(result.error);
+            pageResults.push(result);
+          }
+          questions = mergeRecognizedQuestions(pageResults, config.category);
+        } else {
+          const imageBase64 = await readFileAsBase64(file);
+          const result = await window.openexam.ai.recognizeQuestions(settings, imageBase64, file.type || 'image/png');
+          if (result?.error) throw new Error(result.error);
+          questions = mergeRecognizedQuestions([result], config.category);
+        }
       }
 
       if (questions.length === 0) {
@@ -363,8 +424,8 @@ export default function ImportPaper({ onBack, onImportComplete }) {
             <h3>选择导入方式</h3>
             <div className="mode-cards">
               <div
-                className={`mode-card ${!hasAIConfig() ? 'disabled' : ''}`}
-                onClick={() => { if (hasAIConfig()) { setImportMode('ai'); setStep(1); } }}
+                className={`mode-card ${!hasRecognitionConfig() ? 'disabled' : ''}`}
+                onClick={() => { if (hasRecognitionConfig()) { setImportMode('ai'); setStep(1); } }}
               >
                 <div className="mode-icon ai">
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -372,9 +433,9 @@ export default function ImportPaper({ onBack, onImportComplete }) {
                     <circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/>
                   </svg>
                 </div>
-                <span className="mode-title">AI 智能识别</span>
-                <span className="mode-desc">上传 PDF/图片，AI 自动识别题目</span>
-                {!hasAIConfig() && <span className="mode-tip">需先在设置中配置 AI</span>}
+                <span className="mode-title">智能/OCR 识别</span>
+                <span className="mode-desc">上传 PDF/图片，自动走 AI 引擎或 OCR 引擎</span>
+                {!hasRecognitionConfig() && <span className="mode-tip">需先在设置中配置 AI 或 OCR</span>}
               </div>
 
               <div

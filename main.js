@@ -24,7 +24,9 @@ const createWindow = () => {
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) {
     win.loadURL(devServerUrl);
-    win.webContents.openDevTools({ mode: "detach" });
+    if (['1', 'true', 'yes'].includes(String(process.env.OPENEXAM_DEVTOOLS || '').toLowerCase())) {
+      win.webContents.openDevTools({ mode: "detach" });
+    }
 
     // Forward renderer console errors to terminal
     win.webContents.on('console-message', (event, level, message, line, sourceId) => {
@@ -113,6 +115,26 @@ ipcMain.handle("db:getImportedPapers", () => {
 
 ipcMain.handle("db:getQuestionsByCategory", (event, { category, subCategory, limit, shuffle }) => {
   return database.getQuestionsByCategory(category, subCategory, limit, shuffle);
+});
+
+ipcMain.handle("db:getDailyStats", (event, days) => {
+  return database.getDailyStats(days || 7);
+});
+
+ipcMain.handle("db:getStreakDays", () => {
+  return database.getStreakDays();
+});
+
+ipcMain.handle("db:getTodayStats", () => {
+  return database.getTodayStats();
+});
+
+ipcMain.handle("db:getHeatmapData", (event, days) => {
+  return database.getHeatmapData(days || 90);
+});
+
+ipcMain.handle("db:getGrowthData", () => {
+  return database.getGrowthData();
 });
 
 // AI 相关 IPC 处理器

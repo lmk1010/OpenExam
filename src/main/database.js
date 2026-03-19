@@ -4,6 +4,72 @@ const { app } = require('electron');
 
 let db = null;
 
+function ensurePracticeRecordsSchema() {
+  const columns = db.pragma('table_info(practice_records)');
+  if (!Array.isArray(columns) || !columns.length) return;
+
+  const byName = new Map(columns.map((column) => [column.name, column]));
+  const needsRebuild = [
+    'category',
+    'sub_category',
+    'accuracy',
+    'created_at'
+  ].some((name) => !byName.has(name)) || Number(byName.get('paper_id')?.notnull || 0) !== 0;
+
+  if (!needsRebuild) return;
+
+  const hasColumn = (name) => byName.has(name);
+  const pick = (name, fallback) => hasColumn(name) ? name : fallback;
+  const accuracyExpr = hasColumn('accuracy')
+    ? `COALESCE(accuracy, CASE WHEN COALESCE(total_count, 0) > 0 THEN ROUND(COALESCE(correct_count, 0) * 100.0 / total_count) ELSE 0 END)`
+    : `CASE WHEN COALESCE(total_count, 0) > 0 THEN ROUND(COALESCE(correct_count, 0) * 100.0 / total_count) ELSE 0 END`;
+
+  db.transaction(() => {
+    db.exec(`
+      CREATE TABLE practice_records_new (
+        id TEXT PRIMARY KEY,
+        paper_id TEXT,
+        category TEXT,
+        sub_category TEXT,
+        start_time TEXT NOT NULL,
+        end_time TEXT,
+        duration INTEGER,
+        status TEXT DEFAULT 'ongoing',
+        answers TEXT,
+        correct_count INTEGER DEFAULT 0,
+        total_count INTEGER DEFAULT 0,
+        accuracy INTEGER DEFAULT 0,
+        score INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+
+      INSERT INTO practice_records_new (
+        id, paper_id, category, sub_category, start_time, end_time, duration,
+        status, answers, correct_count, total_count, accuracy, score, created_at
+      )
+      SELECT
+        ${pick('id', 'lower(hex(randomblob(16)))')},
+        ${pick('paper_id', 'NULL')},
+        ${pick('category', 'NULL')},
+        ${pick('sub_category', 'NULL')},
+        ${pick('start_time', 'CURRENT_TIMESTAMP')},
+        ${pick('end_time', 'NULL')},
+        ${pick('duration', '0')},
+        ${pick('status', "'ongoing'")},
+        ${pick('answers', "'{}'")},
+        ${pick('correct_count', '0')},
+        ${pick('total_count', '0')},
+        ${accuracyExpr},
+        ${pick('score', '0')},
+        ${pick('created_at', "COALESCE(start_time, CURRENT_TIMESTAMP)")}
+      FROM practice_records;
+
+      DROP TABLE practice_records;
+      ALTER TABLE practice_records_new RENAME TO practice_records;
+    `);
+  })();
+}
+
 // 初始化数据库
 function initDatabase() {
   const userDataPath = app.getPath('userData');
@@ -77,6 +143,8 @@ function initDatabase() {
       FOREIGN KEY (question_id) REFERENCES questions(id)
     );
   `);
+
+  ensurePracticeRecordsSchema();
 
   // 插入示例数据（如果表为空）
   const count = db.prepare('SELECT COUNT(*) as count FROM papers').get();
@@ -249,8 +317,9 @@ function getCategoryStats() {
     SELECT
       q.category,
       COUNT(DISTINCT q.id) as done
-    FROM questions q
-    INNER JOIN practice_records pr ON pr.paper_id = q.paper_id
+    FROM practice_records pr
+    JOIN json_each(pr.answers) answer_keys
+    INNER JOIN questions q ON q.id = answer_keys.key
     WHERE pr.status = 'completed'
     GROUP BY q.category
   `).all();
@@ -402,6 +471,193 @@ function getQuestionsByCategory(category, subCategory, limit, shuffle) {
   }));
 }
 
+// 获取过去 N 天每日练习量（用于首页动态折线图）
+function getDailyStats(days = 7) {
+  const rows = db.prepare(`
+    SELECT
+      DATE(start_time) as date,
+      COUNT(*) as sessions,
+      COALESCE(SUM(total_count), 0) as total,
+      COALESCE(SUM(correct_count), 0) as correct,
+      COALESCE(SUM(duration), 0) as duration
+    FROM practice_records
+    WHERE start_time >= DATE('now', '-' || ? || ' days')
+    GROUP BY DATE(start_time)
+    ORDER BY date ASC
+  `).all(days - 1);
+
+  // 补全缺失日期为0
+  const result = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const found = rows.find(r => r.date === dateStr);
+    result.push({
+      date: dateStr,
+      sessions: found?.sessions || 0,
+      total: found?.total || 0,
+      correct: found?.correct || 0,
+      duration: found?.duration || 0
+    });
+  }
+  return result;
+}
+
+// 获取连续签到天数（有练习记录即视为已签到）
+function getStreakDays() {
+  const rows = db.prepare(`
+    SELECT DISTINCT DATE(start_time) as date
+    FROM practice_records
+    ORDER BY date DESC
+  `).all();
+
+  if (rows.length === 0) return 0;
+
+  let streak = 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let i = 0; i < rows.length; i++) {
+    const rowDate = new Date(rows[i].date);
+    rowDate.setHours(0, 0, 0, 0);
+    const expected = new Date(today);
+    expected.setDate(today.getDate() - i);
+
+    if (rowDate.getTime() !== expected.getTime()) break;
+    streak++;
+  }
+  return streak;
+}
+
+// 获取总学习时长（分钟）
+function getTotalStudyMinutes() {
+  const row = db.prepare(`
+    SELECT COALESCE(SUM(duration), 0) as total
+    FROM practice_records
+    WHERE status = 'completed'
+  `).get();
+  return Math.floor((row?.total || 0) / 60);
+}
+
+// 获取今日学习数据
+function getTodayStats() {
+  const today = new Date().toISOString().slice(0, 10);
+  const row = db.prepare(`
+    SELECT
+      COALESCE(SUM(total_count), 0) as total,
+      COALESCE(SUM(correct_count), 0) as correct,
+      COALESCE(SUM(duration), 0) as duration,
+      COUNT(*) as sessions
+    FROM practice_records
+    WHERE DATE(start_time) = ?
+  `).get(today);
+  return {
+    total: row?.total || 0,
+    correct: row?.correct || 0,
+    duration: Math.floor((row?.duration || 0) / 60),
+    sessions: row?.sessions || 0
+  };
+}
+
+// 获取过去90天热力图数据（真实练习量）
+function getHeatmapData(days = 90) {
+  const rows = db.prepare(`
+    SELECT
+      DATE(start_time) as date,
+      SUM(total_count) as count
+    FROM practice_records
+    WHERE start_time >= DATE('now', '-' || ? || ' days')
+    GROUP BY DATE(start_time)
+  `).all(days);
+
+  const map = {};
+  rows.forEach(r => { map[r.date] = r.count; });
+
+  const result = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const count = map[dateStr] || 0;
+    // 分级：0=none, 1=1-10, 2=11-30, 3=31-60, 4=60+
+    let level = 0;
+    if (count > 0 && count <= 10) level = 1;
+    else if (count <= 30) level = 2;
+    else if (count <= 60) level = 3;
+    else if (count > 60) level = 4;
+    result.push({ date: dateStr, count, level });
+  }
+  return result;
+}
+
+// 获取成就解锁状态
+function getAchievements() {
+  const totalDone = db.prepare('SELECT COALESCE(SUM(total_count),0) as t FROM practice_records').get().t;
+  const streak = getStreakDays();
+
+  // 满分记录
+  const perfect = db.prepare(`
+    SELECT COUNT(*) as c FROM practice_records
+    WHERE accuracy = 100 AND status = 'completed' AND paper_id IS NOT NULL
+  `).get().c;
+
+  // 30秒内答对（duration<30 且至少1题对）
+  const speed = db.prepare(`
+    SELECT COUNT(*) as c FROM practice_records
+    WHERE duration <= 30 AND correct_count >= 1
+  `).get().c;
+
+  // 完成记录次数
+  const sessions = db.prepare(`SELECT COUNT(*) as c FROM practice_records`).get().c;
+
+  // 掌握度（已做/总题数 × 100）
+  const totalQ = db.prepare('SELECT COUNT(*) as c FROM questions').get().c;
+  const mastery = totalQ > 0 ? Math.round((totalDone / totalQ) * 100) : 0;
+
+  return [
+    { id: 'first', name: '初次答题', desc: '完成第一道题', unlocked: totalDone >= 1 },
+    { id: 'hundred', name: '百题斩', desc: '累计完成100道', unlocked: totalDone >= 100 },
+    { id: 'streak7', name: '连续7天', desc: '连续打卡7天', unlocked: streak >= 7 },
+    { id: 'perfect', name: '满分达人', desc: '模拟考试满分', unlocked: perfect >= 1 },
+    { id: 'speed', name: '速度之星', desc: '30秒内答对', unlocked: speed >= 1 },
+    { id: 'master', name: '知识大师', desc: '掌握度达80%', unlocked: mastery >= 80 },
+  ];
+}
+
+// 获取综合成长中心数据（一次性聚合）
+function getGrowthData() {
+  const streak = getStreakDays();
+  const today = getTodayStats();
+  const heatmap = getHeatmapData(90);
+  const achievements = getAchievements();
+  const practiceStats = getPracticeStats();
+  const totalMinutes = getTotalStudyMinutes();
+
+  // 计算等级 EXP（基于总做题数）
+  const totalDone = practiceStats.totalDone || 0;
+  const expPerLevel = 100;
+  const totalExp = Math.min(totalDone * 2, 9999);
+  const level = Math.floor(totalExp / expPerLevel) + 1;
+  const exp = totalExp % expPerLevel;
+
+  const levelTitles = ['新手学员', '进阶学员', '熟练学员', '高级学员', '专家学员', '达人学员', '王者学员'];
+  const levelTitle = levelTitles[Math.min(level - 1, levelTitles.length - 1)];
+
+  return {
+    streak,
+    today,
+    heatmap,
+    achievements,
+    practiceStats,
+    totalMinutes,
+    level,
+    exp,
+    maxExp: expPerLevel,
+    levelTitle
+  };
+}
+
 // 关闭数据库
 function closeDatabase() {
   if (db) {
@@ -423,5 +679,12 @@ module.exports = {
   importPaper,
   getImportedPapers,
   getQuestionsByCategory,
+  getDailyStats,
+  getStreakDays,
+  getTodayStats,
+  getTotalStudyMinutes,
+  getHeatmapData,
+  getAchievements,
+  getGrowthData,
   closeDatabase
 };

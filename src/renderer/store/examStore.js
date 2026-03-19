@@ -124,6 +124,7 @@ export const actions = {
       answers: answerDetails,
       correctCount,
       totalCount: questions.length,
+      accuracy: questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0,
       score: Math.round((correctCount / questions.length) * 100)
     };
 

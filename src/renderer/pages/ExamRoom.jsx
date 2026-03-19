@@ -88,7 +88,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
     const next = { ...answers, [currentQuestion.id]: key };
     setAnswers(next);
     if (paperId) actions.submitAnswer(currentQuestion.id, key);
-    if (isMemorizeMode) setShowAnalysis(true);
+    setShowAnalysis(true);
   };
 
   const goPrev = () => { if (currentIndex > 0) { setCurrentIndex(i => i - 1); setShowAnalysis(isMemorizeMode); bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); } };

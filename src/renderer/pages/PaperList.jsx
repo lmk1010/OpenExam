@@ -89,8 +89,7 @@ export default function PaperList({ onStartExam }) {
   }, [selectedProvince, selectedYear]);
 
   const handleStart = async (paperId) => {
-    await actions.startExam(paperId);
-    onStartExam(paperId);
+    onStartExam?.(paperId);
   };
 
   if (loading) {

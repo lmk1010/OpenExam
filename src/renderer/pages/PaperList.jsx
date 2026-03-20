@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { actions } from '../store/examStore.js';
+import CustomSelect from '../components/CustomSelect.jsx';
 
 // 省份标签数据
 const PROVINCES = [
@@ -122,18 +123,14 @@ export default function PaperList({ onStartExam }) {
         <div className="filter-left">
           <span className="filter-label">年份</span>
           <div className="custom-select">
-            <select
+            <CustomSelect
               value={selectedYear}
-              onChange={e => setSelectedYear(e.target.value)}
-            >
-              <option value="all">全部年份</option>
-              {years.map(y => (
-                <option key={y} value={y}>{y}年</option>
-              ))}
-            </select>
-            <svg className="select-arrow" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M7 10l5 5 5-5z"/>
-            </svg>
+              onChange={(nextValue) => setSelectedYear(nextValue)}
+              options={[
+                { value: 'all', label: '全部年份' },
+                ...years.map((y) => ({ value: String(y), label: `${y}年` })),
+              ]}
+            />
           </div>
         </div>
         <div className="filter-right">

@@ -13,7 +13,7 @@ const OPENAI_COMPATIBLE_PROVIDERS = {
   openai: {
     sdkType: 'openai',
     baseURL: 'https://api.openai.com/v1',
-    defaultModel: 'gpt-4.1-mini',
+    defaultModel: 'gpt-5.4',
     defaultFormat: 'responses',
     supportedFormats: ['responses', 'chat_completions'],
   },
@@ -132,19 +132,67 @@ function createClient(inputSettings) {
 
 function extractResponseText(response) {
   if (!response) return '';
-  if (typeof response.output_text === 'string' && response.output_text) return response.output_text;
-  if (!Array.isArray(response.output)) return '';
+  const normalizedResponse = response?.response && typeof response.response === 'object'
+    ? response.response
+    : response;
 
-  const parts = [];
-  for (const item of response.output) {
-    if (!Array.isArray(item.content)) continue;
-    for (const content of item.content) {
-      if (content?.type === 'output_text' && typeof content.text === 'string') {
-        parts.push(content.text);
+  const normalizeTextNode = (node) => {
+    if (typeof node === 'string') return node;
+    if (!node || typeof node !== 'object') return '';
+
+    if (typeof node.text === 'string') return node.text;
+    if (typeof node.value === 'string') return node.value;
+    if (typeof node.content === 'string') return node.content;
+
+    if (node.text && typeof node.text === 'object') {
+      if (typeof node.text.value === 'string') return node.text.value;
+      if (Array.isArray(node.text)) {
+        return node.text.map((part) => normalizeTextNode(part)).filter(Boolean).join('');
       }
     }
+
+    if (Array.isArray(node.content)) {
+      return node.content.map((part) => normalizeTextNode(part)).filter(Boolean).join('');
+    }
+
+    return '';
+  };
+
+  if (typeof normalizedResponse.output_text === 'string' && normalizedResponse.output_text.trim()) {
+    return normalizedResponse.output_text;
   }
-  return parts.join('');
+
+  if (Array.isArray(normalizedResponse.output_text)) {
+    const text = normalizedResponse.output_text.map((part) => normalizeTextNode(part)).filter(Boolean).join('');
+    if (text.trim()) return text;
+  }
+
+  if (Array.isArray(normalizedResponse.output)) {
+    const parts = [];
+    for (const item of normalizedResponse.output) {
+      if (Array.isArray(item?.content)) {
+        for (const content of item.content) {
+          const text = normalizeTextNode(content);
+          if (text) parts.push(text);
+        }
+      } else {
+        const text = normalizeTextNode(item);
+        if (text) parts.push(text);
+      }
+    }
+    const joined = parts.join('');
+    if (joined.trim()) return joined;
+  }
+
+  const completionLike = normalizedResponse?.choices?.[0]?.message?.content;
+  if (typeof completionLike === 'string' && completionLike.trim()) return completionLike;
+  if (Array.isArray(completionLike)) {
+    const text = completionLike.map((part) => normalizeTextNode(part)).filter(Boolean).join('\n');
+    if (text.trim()) return text;
+  }
+
+  const fallback = normalizeTextNode(normalizedResponse?.message) || normalizeTextNode(normalizedResponse?.content);
+  return fallback || '';
 }
 
 function normalizeStringContent(content) {
@@ -170,18 +218,8 @@ function toResponsesInput(messages) {
   }));
 }
 
-async function createOpenAITextResponse(client, model, apiFormat, { instructions = '', messages = [], maxOutputTokens = 4096 }) {
-  if (apiFormat === 'responses') {
-    const response = await client.responses.create({
-      model,
-      instructions: instructions || undefined,
-      input: toResponsesInput(messages),
-      max_output_tokens: maxOutputTokens,
-    });
-    return extractResponseText(response);
-  }
-
-  const completion = await client.chat.completions.create({
+function buildOpenAICompletionPayload(model, instructions, messages, maxOutputTokens) {
+  return {
     model,
     messages: [
       ...(instructions ? [{ role: 'system', content: instructions }] : []),
@@ -191,9 +229,114 @@ async function createOpenAITextResponse(client, model, apiFormat, { instructions
       })),
     ],
     max_tokens: maxOutputTokens,
-  });
+  };
+}
 
-  return completion.choices?.[0]?.message?.content || '';
+async function createOpenAITextResponse(client, model, apiFormat, { instructions = '', messages = [], maxOutputTokens = 4096 }) {
+  const completionPayload = buildOpenAICompletionPayload(model, instructions, messages, maxOutputTokens);
+
+  if (apiFormat === 'responses') {
+    const response = await client.responses.create({
+      model,
+      instructions: instructions || undefined,
+      input: toResponsesInput(messages),
+      max_output_tokens: maxOutputTokens,
+    });
+
+    const primaryText = extractResponseText(response);
+    if (primaryText.trim()) return primaryText;
+
+    // 一些兼容网关对 Responses 成功返回但不带 output_text，自动回退到 chat.completions
+    try {
+      const completionFallback = await client.chat.completions.create(completionPayload);
+      const fallbackText = completionFallback.choices?.[0]?.message?.content;
+      if (typeof fallbackText === 'string') return fallbackText;
+      if (Array.isArray(fallbackText)) {
+        return fallbackText
+          .map((item) => normalizeStringContent(item))
+          .filter(Boolean)
+          .join('\n');
+      }
+    } catch (fallbackError) {
+      // 忽略回退失败，保留空字符串交给上层兜底
+    }
+    return '';
+  }
+
+  const completion = await client.chat.completions.create(completionPayload);
+
+  const content = completion.choices?.[0]?.message?.content;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => normalizeStringContent(item))
+      .filter(Boolean)
+      .join('\n');
+  }
+  return '';
+}
+
+async function createOpenAITextResponseStream(client, model, apiFormat, { instructions = '', messages = [], maxOutputTokens = 4096, signal, onDelta }) {
+  const emit = (value) => {
+    if (typeof value !== 'string' || !value) return;
+    if (typeof onDelta === 'function') onDelta(value);
+  };
+  const completionPayload = buildOpenAICompletionPayload(model, instructions, messages, maxOutputTokens);
+
+  if (apiFormat === 'responses') {
+    try {
+      const responseStream = await client.responses.create({
+        model,
+        instructions: instructions || undefined,
+        input: toResponsesInput(messages),
+        max_output_tokens: maxOutputTokens,
+        stream: true,
+      }, signal ? { signal } : undefined);
+
+      let text = '';
+      for await (const event of responseStream) {
+        if (signal?.aborted) throw new Error('请求已取消');
+        if (event?.type === 'response.output_text.delta' && typeof event.delta === 'string') {
+          text += event.delta;
+          emit(event.delta);
+        }
+        if (event?.type === 'response.error') {
+          throw new Error(event.error?.message || 'Responses 流式输出失败');
+        }
+      }
+      if (text.trim()) return text;
+    } catch (streamError) {
+      if (signal?.aborted) throw streamError;
+      // Responses 流式失败时，自动回退 chat.completions stream
+    }
+  }
+
+  const completionStream = await client.chat.completions.create({
+    ...completionPayload,
+    stream: true,
+  }, signal ? { signal } : undefined);
+
+  let text = '';
+  for await (const chunk of completionStream) {
+    if (signal?.aborted) throw new Error('请求已取消');
+    const delta = chunk?.choices?.[0]?.delta?.content;
+    if (typeof delta === 'string' && delta) {
+      text += delta;
+      emit(delta);
+      continue;
+    }
+    if (Array.isArray(delta)) {
+      const piece = delta
+        .map((item) => normalizeStringContent(item))
+        .filter(Boolean)
+        .join('\n');
+      if (piece) {
+        text += piece;
+        emit(piece);
+      }
+    }
+  }
+  return text;
 }
 
 async function recognizeWithOpenAI(client, model, apiFormat, imageBase64, mimeType = 'image/png') {
@@ -260,8 +403,17 @@ function extractJSONObject(text) {
   const raw = String(text || '').trim();
   const fenced = raw.replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim();
   const jsonMatch = fenced.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('无法解析返回结果');
-  return JSON.parse(jsonMatch[0]);
+  if (!jsonMatch) {
+    const error = new Error('无法解析返回结果');
+    error.raw = raw;
+    throw error;
+  }
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    error.raw = raw;
+    throw error;
+  }
 }
 
 async function structureQuestionsFromText(settings, rawText) {
@@ -422,6 +574,49 @@ async function chat(settings, messages) {
   }
 }
 
+async function chatStream(settings, messages, options = {}) {
+  const { onDelta, signal } = options;
+  const { type, client, model, settings: normalizedSettings } = createClient(settings);
+  const fullMessages = [{ role: 'system', content: TEACHER_SYSTEM }, ...(messages || [])];
+
+  if (type === 'anthropic') {
+    const stream = client.messages.stream({
+      model,
+      max_tokens: 4096,
+      system: TEACHER_SYSTEM,
+      messages: fullMessages.filter((message) => message.role !== 'system'),
+    });
+
+    let text = '';
+    stream.on('text', (piece) => {
+      if (!piece) return;
+      text += piece;
+      if (typeof onDelta === 'function') onDelta(piece);
+    });
+
+    if (signal) {
+      if (signal.aborted) {
+        stream.abort();
+      } else {
+        signal.addEventListener('abort', () => stream.abort(), { once: true });
+      }
+    }
+
+    await stream.finalMessage();
+    return { success: true, content: text };
+  }
+
+  const text = await createOpenAITextResponseStream(client, model, normalizedSettings.apiFormat, {
+    instructions: TEACHER_SYSTEM,
+    messages: fullMessages.filter((message) => message.role !== 'system'),
+    maxOutputTokens: 4096,
+    signal,
+    onDelta,
+  });
+
+  return { success: true, content: text };
+}
+
 const CATEGORY_NAMES = {
   yanyu: '言语理解与表达', shuliang: '数量关系', panduan: '判断推理',
   ziliao: '资料分析', changshi: '常识判断',
@@ -434,13 +629,14 @@ const DIFFICULTY_NAMES = {
 function buildGeneratePrompt(config) {
   const catName = CATEGORY_NAMES[config.category] || config.category;
   const diffName = DIFFICULTY_NAMES[config.difficulty] || '中等';
+  const count = Math.max(1, Number(config?.count) || 10);
 
-  return `你是一位资深的考试命题专家。请根据以下要求生成高质量的考试题目。
+  return `你是一位资深的考试命题专家。请根据以下要求生成高质量考试题。
 
 要求：
 - 科目分类: ${catName}
 - 难度等级: ${diffName}
-- 题目数量: ${config.count} 道
+- 题目数量: ${count} 道
 - 题目类型: 单选题（4个选项）
 ${config.customPrompt ? `- 额外要求: ${config.customPrompt}` : ''}
 
@@ -456,7 +652,7 @@ ${config.customPrompt ? `- 额外要求: ${config.customPrompt}` : ''}
         {"key": "D", "content": "选项D"}
       ],
       "answer": "正确答案字母",
-      "analysis": "详细解析（说明为什么选这个答案，其他选项为什么不对）",
+      "analysis": "简要解析（不超过60字）",
       "difficulty": ${config.difficulty},
       "category": "${config.category}",
       "subCategory": ""
@@ -465,39 +661,213 @@ ${config.customPrompt ? `- 额外要求: ${config.customPrompt}` : ''}
 }
 
 注意：
-1. 每道题目必须有完整的题干、4个选项、正确答案和详细解析
+1. 每道题目必须有完整题干、4个选项、正确答案和解析
 2. 题目质量要高，不能有常识性错误
 3. 难度要符合要求，不能过简单也不能过难
-4. 解析要详细，帮助学生理解
+4. 解析简洁清晰，单题不超过60字
 5. 只输出 JSON，不要有其他文字`;
+}
+
+function getGenerateMaxOutputTokens(config) {
+  const count = Math.max(1, Number(config?.count) || 10);
+  return Math.max(1200, Math.min(8000, count * 300));
+}
+
+function normalizeGeneratedOptions(question) {
+  const raw = question?.options;
+  if (Array.isArray(raw)) {
+    const list = raw
+      .filter((item) => item && typeof item === 'object')
+      .map((item, index) => ({
+        key: String(item.key || String.fromCharCode(65 + index)).toUpperCase(),
+        content: String(item.content || '').trim(),
+      }))
+      .filter((item) => item.content);
+    if (list.length >= 2) return list.slice(0, 6);
+  }
+
+  const fallbackKeys = ['A', 'B', 'C', 'D', 'E', 'F'];
+  const fallback = fallbackKeys
+    .map((key) => {
+      const direct = question?.[key] ?? question?.[`option${key}`] ?? question?.[`option_${key.toLowerCase()}`];
+      return { key, content: String(direct || '').trim() };
+    })
+    .filter((item) => item.content);
+  return fallback;
+}
+
+function normalizeGeneratedQuestions(rawQuestions, config) {
+  const list = Array.isArray(rawQuestions) ? rawQuestions : [];
+  return list.map((question, index) => {
+    const content = String(question?.content || '').trim();
+    const options = normalizeGeneratedOptions(question);
+    const answer = String(question?.answer || '').trim().toUpperCase();
+    if (!content || options.length < 2) return null;
+    return {
+      content,
+      options,
+      answer,
+      analysis: String(question?.analysis || '').trim(),
+      difficulty: Math.max(1, Math.min(5, Number(question?.difficulty) || Number(config?.difficulty) || 3)),
+      category: String(question?.category || config?.category || '').trim(),
+      subCategory: String(question?.subCategory || question?.sub_category || '').trim(),
+    };
+  }).filter(Boolean);
+}
+
+async function createOpenAIGenerateText(client, model, normalizedSettings, prompt, maxOutputTokens) {
+  const startedAt = Date.now();
+  // 对 responses 模式优先走 chat.completions，很多兼容网关该路径更快
+  if (normalizedSettings.apiFormat === 'responses') {
+    let fastError = null;
+    try {
+      const fastStartedAt = Date.now();
+      const completion = await client.chat.completions.create({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxOutputTokens,
+      });
+      const content = completion.choices?.[0]?.message?.content;
+      if (typeof content === 'string' && content.trim()) {
+        return {
+          text: content,
+          route: 'chat_completions_fast',
+          routeElapsedMs: Date.now() - fastStartedAt,
+          elapsedMs: Date.now() - startedAt,
+        };
+      }
+      if (Array.isArray(content)) {
+        const text = content
+          .map((item) => normalizeStringContent(item))
+          .filter(Boolean)
+          .join('\n');
+        if (text.trim()) {
+          return {
+            text,
+            route: 'chat_completions_fast',
+            routeElapsedMs: Date.now() - fastStartedAt,
+            elapsedMs: Date.now() - startedAt,
+          };
+        }
+      }
+      fastError = new Error('chat_completions_fast 返回为空');
+    } catch (error) {
+      fastError = error;
+    }
+
+    const fallbackStartedAt = Date.now();
+    const text = await createOpenAITextResponse(client, model, normalizedSettings.apiFormat, {
+      messages: [{ role: 'user', content: prompt }],
+      maxOutputTokens,
+    });
+    return {
+      text,
+      route: 'responses_fallback',
+      routeElapsedMs: Date.now() - fallbackStartedAt,
+      elapsedMs: Date.now() - startedAt,
+      fastError: compactError(fastError),
+    };
+  }
+
+  const genericStartedAt = Date.now();
+  const text = await createOpenAITextResponse(client, model, normalizedSettings.apiFormat, {
+    messages: [{ role: 'user', content: prompt }],
+    maxOutputTokens,
+  });
+  return {
+    text,
+    route: normalizedSettings.apiFormat || 'chat_completions',
+    routeElapsedMs: Date.now() - genericStartedAt,
+    elapsedMs: Date.now() - startedAt,
+  };
+}
+
+function compactError(error) {
+  if (!error) return '';
+  const msg = String(error.message || error || '').trim();
+  return msg || '未知错误';
+}
+
+function toSafeApiHost(apiBase) {
+  const value = String(apiBase || '').trim();
+  if (!value) return '';
+  try {
+    const u = new URL(value);
+    return `${u.protocol}//${u.host}`;
+  } catch (error) {
+    return value;
+  }
 }
 
 async function generatePaper(settings, config) {
   const { type, client, model, settings: normalizedSettings } = createClient(settings);
   const prompt = buildGeneratePrompt(config);
+  const maxOutputTokens = getGenerateMaxOutputTokens(config);
+  const requestId = `gen_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const startedAt = Date.now();
+
+  console.info(`[AI][Generate][${requestId}] start`, {
+    provider: normalizedSettings.aiProvider || '',
+    model,
+    apiFormat: normalizedSettings.apiFormat || '',
+    apiBase: toSafeApiHost(normalizedSettings.apiBase),
+    category: config?.category,
+    difficulty: config?.difficulty,
+    count: config?.count,
+    maxOutputTokens,
+  });
 
   try {
     let resultText = '';
 
     if (type === 'anthropic') {
+      const routeStartedAt = Date.now();
       const response = await client.messages.create({
         model,
-        max_tokens: 8192,
+        max_tokens: maxOutputTokens,
         messages: [{ role: 'user', content: prompt }],
       });
       resultText = response.content?.[0]?.text || '';
+      console.info(`[AI][Generate][${requestId}] route`, {
+        route: 'anthropic_messages',
+        routeElapsedMs: Date.now() - routeStartedAt,
+      });
     } else {
-      resultText = await createOpenAITextResponse(client, model, normalizedSettings.apiFormat, {
-        messages: [{ role: 'user', content: prompt }],
-        maxOutputTokens: 8192,
+      const routeResult = await createOpenAIGenerateText(client, model, normalizedSettings, prompt, maxOutputTokens);
+      resultText = routeResult.text;
+      console.info(`[AI][Generate][${requestId}] route`, {
+        route: routeResult.route,
+        routeElapsedMs: routeResult.routeElapsedMs,
+        fastError: routeResult.fastError || '',
       });
     }
 
+    console.info(`[AI][Generate][${requestId}] model_response`, {
+      elapsedMs: Date.now() - startedAt,
+      textLength: String(resultText || '').length,
+    });
+
     const parsed = extractJSONObject(resultText);
-    return { success: true, questions: parsed.questions || [] };
+    const questions = normalizeGeneratedQuestions(parsed.questions, config);
+    if (!questions.length) {
+      throw new Error('题目格式不完整：缺少有效选项');
+    }
+    console.info(`[AI][Generate][${requestId}] success`, {
+      elapsedMs: Date.now() - startedAt,
+      questions: questions.length,
+    });
+    return { success: true, questions, debugId: requestId };
   } catch (error) {
-    console.error('AI 出卷失败:', error);
-    return { success: false, error: error.message, questions: [] };
+    const rawPreview = typeof error?.raw === 'string'
+      ? error.raw.slice(0, 400)
+      : '';
+    console.error(`[AI][Generate][${requestId}] failed`, {
+      elapsedMs: Date.now() - startedAt,
+      error: compactError(error),
+      stack: String(error?.stack || '').split('\n').slice(0, 3).join(' | '),
+      rawPreview,
+    });
+    return { success: false, error: compactError(error) || '出卷失败', questions: [], debugId: requestId };
   }
 }
 
@@ -535,5 +905,6 @@ module.exports = {
   recognizeQuestions,
   testConnection,
   chat,
+  chatStream,
   generatePaper,
 };

@@ -27,6 +27,18 @@ contextBridge.exposeInMainWorld("openexam", {
     getTodayStats: () => ipcRenderer.invoke("db:getTodayStats"),
     getHeatmapData: (days) => ipcRenderer.invoke("db:getHeatmapData", days),
     getGrowthData: () => ipcRenderer.invoke("db:getGrowthData"),
+    getAISettings: () => ipcRenderer.invoke("db:getAISettings"),
+    saveAISettings: (settings) => ipcRenderer.invoke("db:saveAISettings", settings),
+    getAIConnectionState: () => ipcRenderer.invoke("db:getAIConnectionState"),
+    saveAIConnectionState: (state) => ipcRenderer.invoke("db:saveAIConnectionState", state),
+    createAIChatSession: (input) => ipcRenderer.invoke("db:createAIChatSession", input),
+    getAIChatSessions: (limit) => ipcRenderer.invoke("db:getAIChatSessions", limit),
+    getAIChatMessages: (sessionId, limit) => ipcRenderer.invoke("db:getAIChatMessages", sessionId, limit),
+    addAIChatMessage: (input) => ipcRenderer.invoke("db:addAIChatMessage", input),
+    renameAIChatSession: (sessionId, title) => ipcRenderer.invoke("db:renameAIChatSession", sessionId, title),
+    deleteAIChatSession: (sessionId) => ipcRenderer.invoke("db:deleteAIChatSession", sessionId),
+    exportAllData: () => ipcRenderer.invoke("db:exportAllData"),
+    clearAllData: () => ipcRenderer.invoke("db:clearAllData"),
   },
 
   // AI API
@@ -36,6 +48,16 @@ contextBridge.exposeInMainWorld("openexam", {
       ipcRenderer.invoke("ai:recognizeQuestions", { settings, imageBase64, mimeType }),
     chat: (settings, messages) =>
       ipcRenderer.invoke("ai:chat", { settings, messages }),
+    chatStreamStart: (settings, messages, requestId) =>
+      ipcRenderer.invoke("ai:chatStreamStart", { settings, messages, requestId }),
+    chatStreamCancel: (requestId) =>
+      ipcRenderer.invoke("ai:chatStreamCancel", requestId),
+    onChatStreamEvent: (handler) => {
+      if (typeof handler !== "function") return () => {};
+      const listener = (_event, payload) => handler(payload);
+      ipcRenderer.on("ai:chatStream:event", listener);
+      return () => ipcRenderer.removeListener("ai:chatStream:event", listener);
+    },
     generatePaper: (settings, config) =>
       ipcRenderer.invoke("ai:generatePaper", { settings, config }),
   }

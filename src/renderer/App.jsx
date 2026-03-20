@@ -11,7 +11,9 @@ import AIGenerate from "./pages/AIGenerate.jsx";
 import WrongBook from "./pages/WrongBook.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import GrowthCenter from "./pages/GrowthCenter.jsx";
+import OnboardingTour from "./components/OnboardingTour.jsx";
 import { actions, getState } from "./store/examStore.js";
+import { normalizeAISettings } from "./store/aiSettings.js";
 
 const DynamicChart = ({ data, onHover }) => {
   const containerRef = React.useRef(null);
@@ -154,6 +156,7 @@ const DynamicChart = ({ data, onHover }) => {
 
 
 export default function App() {
+  const ONBOARDING_STORAGE_KEY = "openexam_onboarding_done_v1";
   const [theme, setTheme] = useState("light");
   const [page, setPage] = useState("home");
   const [currentPaperId, setCurrentPaperId] = useState(null);
@@ -163,6 +166,7 @@ export default function App() {
   const [practiceQuestions, setPracticeQuestions] = useState(null); // 专项练习题目
   const [practiceConfig, setPracticeConfig] = useState(null); // 练习配置
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -170,6 +174,53 @@ export default function App() {
       window.openexam.setTheme(theme);
     }
   }, [theme]);
+
+  useEffect(() => {
+    const syncAISettingsFromSQLite = async () => {
+      try {
+        if (!window.openexam?.db?.getAISettings) return;
+        const sqliteSettings = await window.openexam.db.getAISettings();
+        if (sqliteSettings && typeof sqliteSettings === "object") {
+          localStorage.setItem("openexam_settings", JSON.stringify(normalizeAISettings(sqliteSettings)));
+        }
+      } catch (error) {
+        console.error("同步 AI 配置失败:", error);
+      }
+    };
+    syncAISettingsFromSQLite();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const done = localStorage.getItem(ONBOARDING_STORAGE_KEY) === "1";
+      if (!done) setShowOnboarding(true);
+    } catch (error) {
+      setShowOnboarding(true);
+    }
+  }, []);
+
+  const finishOnboarding = () => {
+    try {
+      localStorage.setItem(ONBOARDING_STORAGE_KEY, "1");
+    } catch (error) {
+      // ignore storage failures
+    }
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingNavigate = ({ page: targetPage, tab }) => {
+    if (tab !== undefined) setActiveTab(tab);
+    if (targetPage) setPage(targetPage);
+  };
+
+  const onboarding = (
+    <OnboardingTour
+      open={showOnboarding}
+      onFinish={finishOnboarding}
+      onSkip={finishOnboarding}
+      onNavigate={handleOnboardingNavigate}
+    />
+  );
 
   const handleStartExam = async (paperId) => {
     await actions.startExam(paperId);
@@ -247,6 +298,7 @@ export default function App() {
     return (
       <div className={`app theme-${theme}`}>
         <ExamRoom paperId={currentPaperId} onFinish={handleFinishExam} onExit={handleExitExam} />
+        {onboarding}
       </div>
     );
   }
@@ -265,6 +317,7 @@ export default function App() {
             setPage("practice");
           }}
         />
+        {onboarding}
       </div>
     );
   }
@@ -274,6 +327,7 @@ export default function App() {
     return (
       <div className={`app theme-${theme}`}>
         <ExamResult result={examResult} onBack={handleBackToList} />
+        {onboarding}
       </div>
     );
   }
@@ -381,18 +435,22 @@ export default function App() {
             ) : page === "import" ? (
               <ImportPaper
                 onBack={() => setPage("practice")}
-                onImportComplete={(data) => { console.log('导入数据:', data); setPage("practice"); }}
+                onImportComplete={(data) => {
+                  console.log('导入数据:', data);
+                  setActiveTab('模拟考试');
+                  setPage("papers");
+                }}
               />
             ) : page === "settings" ? (
               <Settings onBack={() => setPage("home")} />
             ) : page === "ai-generate" ? (
-              <AIGenerate />
+              <AIGenerate onStartExam={handleStartExam} />
             ) : page === "ai-teacher" ? (
               <AITeacher />
             ) : page === "wrong-book" ? (
               <WrongBook />
             ) : page === "analytics" ? (
-              <Analytics />
+              <Analytics onOpenSettings={() => setPage("settings")} />
             ) : page === "growth" ? (
               <GrowthCenter />
             ) : (
@@ -401,6 +459,7 @@ export default function App() {
           </div>
         </section>
       </div>
+      {onboarding}
     </div>
   );
 }

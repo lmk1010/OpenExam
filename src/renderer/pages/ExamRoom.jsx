@@ -75,6 +75,29 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
   const isMemorizeMode  = config?.mode === 'memorize';
 
   useEffect(() => {
+    if (!currentQuestion) return;
+    try {
+      const payload = {
+        questionId: currentQuestion.id,
+        paperTitle: paper?.title || '',
+        index: currentIndex + 1,
+        total: questions.length,
+        category: currentQuestion.category || config?.category || '',
+        subCategory: currentQuestion.sub_category || currentQuestion.subCategory || config?.subCategory || '',
+        content: currentQuestion.content || '',
+        options: Array.isArray(currentQuestion.options) ? currentQuestion.options : [],
+        answer: currentQuestion.answer || '',
+        analysis: currentQuestion.analysis || '',
+        userAnswer: answers[currentQuestion.id] || '',
+        updatedAt: new Date().toISOString(),
+      };
+      localStorage.setItem('openexam_question_context', JSON.stringify(payload));
+    } catch (error) {
+      // 忽略上下文同步失败，不影响答题主流程
+    }
+  }, [answers, config?.category, config?.subCategory, currentIndex, currentQuestion, paper?.title, questions.length]);
+
+  useEffect(() => {
     const t = setInterval(() => setTimeElapsed(s => s + 1), 1000);
     return () => clearInterval(t);
   }, []);
@@ -105,12 +128,16 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
         else if (answers[q.id]) wrongQuestions.push({ questionId: q.id, paperId: q.paper_id || paperId, userAnswer: answers[q.id], correctAnswer: q.answer });
       });
       const result = { totalCount: questions.length, correctCount, wrongCount: Object.keys(answers).length - correctCount, unanswered, accuracy: Math.round((correctCount / questions.length) * 100), timeElapsed, answers, questions, config };
+      if (paperId) {
+        onFinish(await actions.finishExam());
+        return;
+      }
       try {
         const recordId = `record_${Date.now()}`;
         await window.openexam.db.savePracticeRecord({ id: recordId, paperId: paperId || null, category: config?.category || null, subCategory: config?.subCategory || null, startTime: new Date(Date.now() - timeElapsed * 1000).toISOString(), endTime: new Date().toISOString(), duration: timeElapsed, status: 'completed', answers, correctCount, totalCount: questions.length, accuracy: result.accuracy, score: Math.round((correctCount / questions.length) * 100) });
         for (const wq of wrongQuestions) await window.openexam.db.addWrongQuestion(wq);
       } catch (err) { console.error('保存失败:', err); }
-      if (paperId) { onFinish(await actions.finishExam()); } else { onFinish(result); }
+      onFinish(result);
     };
     setConfirmModal({ show: true, title: '确定交卷？', message: unanswered > 0 ? `还有 ${unanswered} 题未作答` : '提交后将无法修改答案', onConfirm: () => { setConfirmModal({ show: false }); doSubmit(); } });
   };

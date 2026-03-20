@@ -137,8 +137,62 @@ ipcMain.handle("db:getGrowthData", () => {
   return database.getGrowthData();
 });
 
+ipcMain.handle("db:getAISettings", () => {
+  return database.getAISettings();
+});
+
+ipcMain.handle("db:saveAISettings", (event, settings) => {
+  return database.saveAISettings(settings);
+});
+
+ipcMain.handle("db:getAIConnectionState", () => {
+  return database.getAIConnectionState();
+});
+
+ipcMain.handle("db:saveAIConnectionState", (event, state) => {
+  return database.saveAIConnectionState(state);
+});
+
+ipcMain.handle("db:createAIChatSession", (event, input) => {
+  return database.createAIChatSession(input || {});
+});
+
+ipcMain.handle("db:getAIChatSessions", (event, limit) => {
+  return database.getAIChatSessions(limit || 30);
+});
+
+ipcMain.handle("db:getAIChatMessages", (event, sessionId, limit) => {
+  return database.getAIChatMessages(sessionId, limit || 300);
+});
+
+ipcMain.handle("db:addAIChatMessage", (event, input) => {
+  return database.addAIChatMessage(input || {});
+});
+
+ipcMain.handle("db:renameAIChatSession", (event, sessionId, title) => {
+  return database.renameAIChatSession(sessionId, title);
+});
+
+ipcMain.handle("db:deleteAIChatSession", (event, sessionId) => {
+  return database.deleteAIChatSession(sessionId);
+});
+
+ipcMain.handle("db:exportAllData", () => {
+  return database.exportAllData();
+});
+
+ipcMain.handle("db:clearAllData", () => {
+  return database.clearAllData();
+});
+
 // AI 相关 IPC 处理器
 const aiService = require("./src/main/ai/index.js");
+const activeChatStreams = new Map();
+
+function emitChatStreamEvent(sender, payload) {
+  if (!sender || sender.isDestroyed()) return;
+  sender.send("ai:chatStream:event", payload);
+}
 
 ipcMain.handle("ai:testConnection", async (event, settings) => {
   return aiService.testConnection(settings);
@@ -152,8 +206,87 @@ ipcMain.handle("ai:chat", async (event, { settings, messages }) => {
   return aiService.chat(settings, messages);
 });
 
+ipcMain.handle("ai:chatStreamStart", async (event, { settings, messages, requestId }) => {
+  const id = String(requestId || "").trim();
+  if (!id) return { success: false, error: "requestId 不能为空" };
+
+  const sender = event.sender;
+  const previous = activeChatStreams.get(id);
+  if (previous) {
+    previous.abortController.abort();
+    activeChatStreams.delete(id);
+  }
+
+  const abortController = new AbortController();
+  activeChatStreams.set(id, { abortController, senderId: sender.id });
+
+  (async () => {
+    try {
+      const result = await aiService.chatStream(settings, messages, {
+        signal: abortController.signal,
+        onDelta: (delta) => {
+          emitChatStreamEvent(sender, { requestId: id, type: "delta", delta: String(delta || "") });
+        },
+      });
+
+      if (!abortController.signal.aborted) {
+        emitChatStreamEvent(sender, {
+          requestId: id,
+          type: "done",
+          content: String(result?.content || ""),
+          success: Boolean(result?.success),
+        });
+      }
+    } catch (error) {
+      emitChatStreamEvent(sender, {
+        requestId: id,
+        type: abortController.signal.aborted ? "cancelled" : "error",
+        error: error?.message || "流式请求失败",
+      });
+    } finally {
+      const current = activeChatStreams.get(id);
+      if (current && current.abortController === abortController) {
+        activeChatStreams.delete(id);
+      }
+    }
+  })();
+
+  return { success: true };
+});
+
+ipcMain.handle("ai:chatStreamCancel", async (event, requestId) => {
+  const id = String(requestId || "").trim();
+  if (!id) return { success: false };
+  const holder = activeChatStreams.get(id);
+  if (!holder) return { success: false };
+  holder.abortController.abort();
+  activeChatStreams.delete(id);
+  return { success: true };
+});
+
 ipcMain.handle("ai:generatePaper", async (event, { settings, config }) => {
-  return aiService.generatePaper(settings, config);
+  const requestId = `ipc_gen_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const startedAt = Date.now();
+  console.info(`[IPC][Generate][${requestId}] start`, {
+    provider: settings?.aiProvider || "",
+    model: settings?.model || settings?.customModel || "",
+    apiFormat: settings?.apiFormat || "",
+    count: config?.count,
+    category: config?.category,
+    difficulty: config?.difficulty,
+  });
+
+  const result = await aiService.generatePaper(settings, config);
+
+  console.info(`[IPC][Generate][${requestId}] done`, {
+    elapsedMs: Date.now() - startedAt,
+    success: Boolean(result?.success),
+    questions: Array.isArray(result?.questions) ? result.questions.length : 0,
+    debugId: result?.debugId || "",
+    error: result?.success ? "" : String(result?.error || ""),
+  });
+
+  return result;
 });
 
 app.on("window-all-closed", () => {

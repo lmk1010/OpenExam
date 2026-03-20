@@ -55,7 +55,19 @@ export default function ExamResult({ result, onBack }) {
 
   // 获取题目：优先使用 result 中的，否则从 store 获取
   const questions = result?.questions || getState().currentQuestions || [];
-  const answers = result?.answers || {};
+  const rawAnswers = result?.answers || {};
+  const answers = Object.entries(rawAnswers).reduce((acc, [questionId, value]) => {
+    if (typeof value === 'string') {
+      acc[questionId] = value;
+      return acc;
+    }
+    if (value && typeof value === 'object') {
+      acc[questionId] = value.userAnswer || value.answer || '';
+      return acc;
+    }
+    acc[questionId] = '';
+    return acc;
+  }, {});
   const currentQuestion = questions[currentIndex];
 
   // 计算分类统计
@@ -106,10 +118,12 @@ export default function ExamResult({ result, onBack }) {
     const q = questions.find(q => q.id === id);
     return q && answers[id] === q.answer;
   }).length;
+  const answeredCount = questions.filter(q => Boolean(answers[q.id])).length;
+  const unansweredCount = result?.unanswered ?? Math.max(totalCount - answeredCount, 0);
   const accuracy = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
   const timeElapsed = result?.timeElapsed || result?.duration || 0;
   const avgTimePerQuestion = totalCount > 0 ? Math.round(timeElapsed / totalCount) : 0;
-  const wrongCount = totalCount - correctCount - (result?.unanswered || 0);
+  const wrongCount = result?.wrongCount ?? Math.max(answeredCount - correctCount, 0);
 
   const level = getScoreLevel(accuracy);
 
@@ -307,7 +321,7 @@ export default function ExamResult({ result, onBack }) {
             <span className="metric-value">{totalCount}</span>
             <span className="metric-label">总题数</span>
           </div>
-          <span className="metric-rate" style={{ color: '#f59e0b' }}>{result?.unanswered || 0}未答</span>
+          <span className="metric-rate" style={{ color: '#f59e0b' }}>{unansweredCount}未答</span>
         </div>
 
         {/* 第二行：趋势图 + 分类统计 */}
@@ -379,7 +393,7 @@ export default function ExamResult({ result, onBack }) {
           <div className="dots-legend">
             <span><i className="leg-dot correct"/>正确 {correctCount}</span>
             <span><i className="leg-dot wrong"/>错误 {wrongCount}</span>
-            <span><i className="leg-dot skip"/>未答 {result?.unanswered || 0}</span>
+            <span><i className="leg-dot skip"/>未答 {unansweredCount}</span>
           </div>
         </div>
 

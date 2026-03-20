@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
+import { getAISettings, isAIConfigured } from "../store/aiSettings.js";
 
 const CN = {
   yanyu: "言语理解",
@@ -175,12 +176,15 @@ function StackedBar({ correct, wrong, total }) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-export default function Analytics() {
+export default function Analytics({ onOpenSettings }) {
   const [stats, setStats] = useState({
     totalQuestions: 0, totalDone: 0, accuracy: 0,
     wrongCount: 0, correctCount: 0,
   });
   const [categories, setCategories] = useState([]);
+  const [diagnosis, setDiagnosis] = useState("");
+  const [diagnosisLoading, setDiagnosisLoading] = useState(false);
+  const [diagnosisError, setDiagnosisError] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -217,6 +221,46 @@ export default function Analytics() {
     { label: "综合正确率", value: `${stats.accuracy}`,            unit: "%",  icon: ICONS.check, color: "#00b894", bg: "rgba(0,184,148,0.06)", note: `正确 ${stats.correctCount} 道` },
     { label: "待攻克题目", value: stats.wrongCount.toLocaleString(), unit: "道", icon: ICONS.cross, color: "#e74c3c", bg: "rgba(231,76,60,0.06)", note: "错误 / 跳过" },
   ];
+  const aiReady = isAIConfigured() && Boolean(window.openexam?.ai);
+
+  const handleGenerateDiagnosis = async () => {
+    if (!aiReady) {
+      onOpenSettings?.();
+      return;
+    }
+
+    const weakest = [...radarData].sort((a, b) => a.pct - b.pct).slice(0, 2);
+    const prompt = [
+      "请基于以下学习数据，生成一份简短可执行的诊断报告。",
+      `题库总量: ${totalPossible}`,
+      `已练习: ${totalDone}`,
+      `综合正确率: ${stats.accuracy}%`,
+      `错误/跳过: ${stats.wrongCount}`,
+      `未练习: ${unanswered}`,
+      `薄弱分类: ${weakest.map((item) => `${item.name}(${item.pct}%)`).join("、") || "暂无"}`,
+      "请按以下结构输出：",
+      "1. 现状判断（1-2句）",
+      "2. 关键问题（最多3条）",
+      "3. 7天可执行计划（每天1行）",
+      "4. 明日优先任务（3条）",
+    ].join("\n");
+
+    setDiagnosisLoading(true);
+    setDiagnosisError("");
+    try {
+      const settings = getAISettings();
+      const result = await window.openexam.ai.chat(settings, [{ role: "user", content: prompt }]);
+      if (result?.success && result.content) {
+        setDiagnosis(result.content.trim());
+      } else {
+        setDiagnosisError(result?.error || "诊断生成失败");
+      }
+    } catch (error) {
+      setDiagnosisError(error.message || "诊断生成失败");
+    } finally {
+      setDiagnosisLoading(false);
+    }
+  };
 
   return (
     <section className="main-panel" style={{
@@ -385,13 +429,22 @@ export default function Analytics() {
                 backgroundImage: "radial-gradient(rgba(109,94,251,0.08) 1px, transparent 1px)",
                 backgroundSize: "34px 34px",
               }}>
-                <div>
-                  <span style={{ color: "var(--accent)", fontWeight: 600 }}>[SYSTEM]</span> 智能诊断节点
-                </div>
-                <div style={{ opacity: 0.7 }}>
-                  &gt; 诊断服务未启用。<br/>
-                  &gt; 请配置大模型 API Key 后激活。
-                </div>
+                {diagnosisLoading ? (
+                  <div style={{ opacity: 0.85 }}>
+                    <span style={{ color: "var(--accent)", fontWeight: 600 }}>[SYSTEM]</span> 正在生成诊断...
+                  </div>
+                ) : diagnosis ? (
+                  <div style={{ whiteSpace: "pre-wrap", color: "var(--text)", lineHeight: 1.7 }}>{diagnosis}</div>
+                ) : diagnosisError ? (
+                  <div style={{ color: "#e74c3c", lineHeight: 1.7 }}>
+                    <span style={{ color: "var(--accent)", fontWeight: 600 }}>[ERROR]</span> {diagnosisError}
+                  </div>
+                ) : (
+                  <div style={{ opacity: 0.7 }}>
+                    &gt; 点击下方按钮生成个性化学习诊断。<br/>
+                    &gt; 已接入当前统计与分类掌握度。
+                  </div>
+                )}
                 <div
                   style={{
                     marginTop: "auto", display: "inline-flex", alignItems: "center", gap: 5,
@@ -403,9 +456,10 @@ export default function Analytics() {
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = "rgba(109,94,251,0.15)"}
                   onMouseLeave={e => e.currentTarget.style.background = "rgba(109,94,251,0.09)"}
+                  onClick={handleGenerateDiagnosis}
                 >
                   <Icon path={<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01"/>} size={11} color="var(--accent)" sw={2} />
-                  前往设置 / Settings
+                  {aiReady ? (diagnosis ? "重新生成诊断" : "生成智能诊断") : "前往设置 / Settings"}
                 </div>
               </div>
             </div>

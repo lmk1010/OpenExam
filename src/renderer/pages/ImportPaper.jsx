@@ -170,12 +170,12 @@ export default function ImportPaper({ onBack, onImportComplete }) {
         alert('请选择 PDF 或图片文件');
       }
     } else {
-      if (['csv', 'xls', 'xlsx'].includes(ext)) {
+      if (['csv', 'xls', 'xlsx', 'json'].includes(ext)) {
         setFile(f);
         setConfig(prev => ({ ...prev, paperTitle: f.name.replace(/\.[^/.]+$/, '') }));
         setStep(2);
       } else {
-        alert('请选择 Excel 或 CSV 文件');
+        alert('请选择 Excel、CSV 或 JSON 文件');
       }
     }
   };
@@ -187,6 +187,7 @@ export default function ImportPaper({ onBack, onImportComplete }) {
     if (['doc', 'docx'].includes(ext)) return '📝';
     if (ext === 'csv') return '📊';
     if (['xls', 'xlsx'].includes(ext)) return '📊';
+    if (ext === 'json') return '🧩';
     return '📁';
   };
 
@@ -203,6 +204,62 @@ export default function ImportPaper({ onBack, onImportComplete }) {
     '判断推理': 'panduan',
     '资料分析': 'ziliao',
     '常识判断': 'changshi',
+  };
+
+  const normalizeJsonQuestion = (rawQuestion) => {
+    if (!rawQuestion || typeof rawQuestion !== 'object') return null;
+    const content = String(rawQuestion.content || '').trim();
+    if (!content) return null;
+
+    const normalizedOptions = Array.isArray(rawQuestion.options)
+      ? rawQuestion.options
+          .map((option, index) => {
+            if (option && typeof option === 'object') {
+              return {
+                key: String(option.key || String.fromCharCode(65 + index)).toUpperCase(),
+                content: String(option.content || ''),
+              };
+            }
+            return {
+              key: String.fromCharCode(65 + index),
+              content: String(option || ''),
+            };
+          })
+          .filter((option) => option.content)
+      : [];
+
+    if (normalizedOptions.length === 0) return null;
+
+    const categoryRaw = String(rawQuestion.category || '').trim();
+    const category = categoryNameToKey[categoryRaw] || categoryRaw || config.category;
+
+    return {
+      content,
+      options: normalizedOptions,
+      answer: String(rawQuestion.answer || '').trim().toUpperCase(),
+      analysis: String(rawQuestion.analysis || ''),
+      category,
+      subCategory: String(rawQuestion.subCategory || rawQuestion.sub_category || ''),
+      type: String(rawQuestion.type || 'single').toLowerCase(),
+      difficulty: Number(rawQuestion.difficulty) || 2,
+      tags: rawQuestion.tags || [],
+    };
+  };
+
+  const parseJsonFile = async (targetFile) => {
+    const text = await targetFile.text();
+    const parsed = JSON.parse(text);
+    const candidate = Array.isArray(parsed)
+      ? parsed
+      : (Array.isArray(parsed?.questions) ? parsed.questions : parsed?.data?.questions);
+
+    if (!Array.isArray(candidate)) {
+      throw new Error('JSON 格式不正确，需要 questions 数组');
+    }
+
+    return candidate
+      .map((item) => normalizeJsonQuestion(item))
+      .filter(Boolean);
   };
 
   // 解析 Excel/CSV 文件
@@ -296,6 +353,8 @@ export default function ImportPaper({ onBack, onImportComplete }) {
 
       if (['csv', 'xls', 'xlsx'].includes(ext)) {
         questions = await parseFile(file);
+      } else if (ext === 'json') {
+        questions = await parseJsonFile(file);
       } else {
         const settings = getAISettings();
         const needsAI = settings.recognizeEngine !== 'ocr' || settings.ocrResponseMode === 'text';
@@ -481,11 +540,11 @@ export default function ImportPaper({ onBack, onImportComplete }) {
               </div>
               <p className="drop-text">拖拽文件到此处，或点击选择</p>
               <p className="drop-hint">
-                {importMode === 'ai' ? '支持 PDF、图片格式' : '支持 Excel、CSV 格式'}
+                {importMode === 'ai' ? '支持 PDF、图片格式' : '支持 Excel、CSV、JSON 格式'}
               </p>
               <input
                 type="file"
-                accept={importMode === 'ai' ? '.pdf,.png,.jpg,.jpeg' : '.csv,.xls,.xlsx'}
+                accept={importMode === 'ai' ? '.pdf,.png,.jpg,.jpeg' : '.csv,.xls,.xlsx,.json'}
                 onChange={handleFileSelect}
                 className="file-input"
               />

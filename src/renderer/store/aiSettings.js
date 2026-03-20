@@ -1,7 +1,7 @@
 const OPENAI_FORMATS = ['responses', 'chat_completions'];
 
 export const AI_PROVIDERS = [
-  { id: 'openai', name: 'OpenAI', icon: 'openai', sdkType: 'openai', baseUrl: 'https://api.openai.com/v1', models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'], supportsVision: true, supportedFormats: OPENAI_FORMATS, defaultFormat: 'responses' },
+  { id: 'openai', name: 'OpenAI', icon: 'openai', sdkType: 'openai', baseUrl: 'https://api.openai.com/v1', models: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.3-chat-latest', 'gpt-5.2', 'gpt-5.2-mini', 'gpt-5', 'gpt-5-mini', 'gpt-5-codex', 'gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.1-codex', 'gpt-5.1-codex-max', 'gpt-5.1-codex-mini', 'codex-mini-latest', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'], supportsVision: true, supportedFormats: OPENAI_FORMATS, defaultFormat: 'responses' },
   { id: 'minimax', name: 'MiniMax', icon: 'minimax', sdkType: 'openai', baseUrl: 'https://api.minimax.chat/v1', models: ['MiniMax-M1', 'MiniMax-Text-01', 'abab-6.5s-chat'], supportsVision: true, supportedFormats: ['chat_completions'], defaultFormat: 'chat_completions' },
   { id: 'kimi', name: 'Kimi', icon: 'kimi', sdkType: 'openai', baseUrl: 'https://api.moonshot.cn/v1', models: ['moonshot-v1-128k', 'moonshot-v1-32k', 'kimi-k2-0711-preview'], supportsVision: true, supportedFormats: ['chat_completions'], defaultFormat: 'chat_completions' },
   { id: 'glm', name: '智谱 GLM', icon: 'glm', sdkType: 'openai', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-4.5', 'glm-4.5-air', 'glm-4v', 'glm-4'], supportsVision: true, supportedFormats: ['chat_completions'], defaultFormat: 'chat_completions' },

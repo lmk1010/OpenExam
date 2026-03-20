@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AI_PROVIDERS, DEFAULT_AI_SETTINGS, getAIProvider, normalizeAISettings } from '../store/aiSettings.js';
+import CustomSelect from '../components/CustomSelect.jsx';
 
 const ProviderIcon = ({ type }) => {
   const icons = {
@@ -21,18 +22,68 @@ export default function Settings({ onBack }) {
   const [showKey, setShowKey] = useState(false);
   const [testStatus, setTestStatus] = useState(null);
   const [activeSection, setActiveSection] = useState('ai');
+  const [persistStatus, setPersistStatus] = useState('loading');
+  const [lastSavedAt, setLastSavedAt] = useState('');
+  const [connectionState, setConnectionState] = useState(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('openexam_settings');
-    if (saved) {
-      try { setSettings(normalizeAISettings(JSON.parse(saved))); } catch (e) {}
-    }
+    let mounted = true;
+    const loadSettings = async () => {
+      let next = normalizeAISettings(null);
+      try {
+        const localSaved = localStorage.getItem('openexam_settings');
+        if (localSaved) {
+          next = normalizeAISettings(JSON.parse(localSaved));
+        }
+      } catch (e) {}
+
+      try {
+        if (window.openexam?.db?.getAISettings) {
+          const sqliteSettings = await window.openexam.db.getAISettings();
+          if (sqliteSettings && typeof sqliteSettings === 'object') {
+            next = normalizeAISettings(sqliteSettings);
+            localStorage.setItem('openexam_settings', JSON.stringify(next));
+          }
+          setPersistStatus('sqlite');
+        } else {
+          setPersistStatus('local');
+        }
+      } catch (error) {
+        console.error('读取 SQLite 配置失败:', error);
+        setPersistStatus('local');
+      }
+
+      try {
+        if (window.openexam?.db?.getAIConnectionState) {
+          const state = await window.openexam.db.getAIConnectionState();
+          if (mounted) setConnectionState(state || null);
+        }
+      } catch (error) {
+        console.error('读取连接状态失败:', error);
+      }
+
+      if (mounted) setSettings(next);
+    };
+
+    loadSettings();
+    return () => { mounted = false; };
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const normalized = normalizeAISettings(settings);
     setSettings(normalized);
     localStorage.setItem('openexam_settings', JSON.stringify(normalized));
+    const now = new Date().toISOString();
+    setLastSavedAt(now);
+    try {
+      if (window.openexam?.db?.saveAISettings) {
+        await window.openexam.db.saveAISettings(normalized);
+        setPersistStatus('sqlite');
+      }
+    } catch (error) {
+      console.error('写入 SQLite 配置失败:', error);
+      setPersistStatus('local');
+    }
     setTestStatus('saved');
     setTimeout(() => setTestStatus(null), 2000);
   };
@@ -43,6 +94,18 @@ export default function Settings({ onBack }) {
     try {
       if (window.openexam?.ai) {
         const result = await window.openexam.ai.testConnection(settings);
+        const state = {
+          status: result.success ? 'success' : 'error',
+          provider: settings.aiProvider || '',
+          model: settings.model || '',
+          apiBase: settings.apiBase || '',
+          checkedAt: new Date().toISOString(),
+          error: result.success ? '' : (result.error || ''),
+        };
+        setConnectionState(state);
+        if (window.openexam?.db?.saveAIConnectionState) {
+          await window.openexam.db.saveAIConnectionState(state);
+        }
         if (result.success) setTestStatus('success');
         else { setTestStatus('error'); console.error('连接失败:', result.error); }
       } else {
@@ -55,16 +118,76 @@ export default function Settings({ onBack }) {
     setTimeout(() => setTestStatus(null), 3000);
   };
 
+  const formatTime = (value) => {
+    if (!value) return '-';
+    try {
+      return new Date(value).toLocaleString();
+    } catch (error) {
+      return value;
+    }
+  };
+
   const handleProviderChange = (providerId) => {
     const provider = getAIProvider(providerId);
-    setSettings(prev => normalizeAISettings({
-      ...prev,
-      aiProvider: providerId,
-      apiBase: provider?.baseUrl || '',
-      model: provider?.models?.[0] || prev.model || '',
-      customModel: providerId === 'custom' ? prev.customModel : '',
-      apiFormat: provider?.defaultFormat || prev.apiFormat,
-    }));
+    setSettings(prev => {
+      const isSameProvider = prev.aiProvider === providerId;
+      const nextBase = isSameProvider
+        ? prev.apiBase
+        : (provider?.baseUrl || prev.apiBase || '');
+      const nextModel = isSameProvider
+        ? prev.model
+        : (provider?.models?.[0] || prev.model || '');
+
+      return normalizeAISettings({
+        ...prev,
+        aiProvider: providerId,
+        apiBase: nextBase,
+        model: nextModel,
+        customModel: providerId === 'custom' ? prev.customModel : '',
+        apiFormat: provider?.defaultFormat || prev.apiFormat,
+      });
+    });
+  };
+
+  const handleExportAllData = async () => {
+    if (!window.openexam?.db?.exportAllData) {
+      alert('当前环境不支持导出');
+      return;
+    }
+
+    try {
+      const payload = await window.openexam.db.exportAllData();
+      const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+      const filename = `openexam-backup-${stamp}.json`;
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      alert(`导出成功：${filename}`);
+    } catch (error) {
+      alert(`导出失败：${error.message || '未知错误'}`);
+    }
+  };
+
+  const handleClearAllData = async () => {
+    if (!window.openexam?.db?.clearAllData) {
+      alert('当前环境不支持清空数据');
+      return;
+    }
+
+    const confirmed = window.confirm('该操作将删除所有题库、练习记录和错题数据，且不可恢复。是否继续？');
+    if (!confirmed) return;
+
+    try {
+      await window.openexam.db.clearAllData();
+      alert('数据已清空');
+      window.location.reload();
+    } catch (error) {
+      alert(`清空失败：${error.message || '未知错误'}`);
+    }
   };
 
   const currentProvider = getAIProvider(settings.aiProvider);
@@ -168,17 +291,18 @@ export default function Settings({ onBack }) {
                   {currentProvider?.sdkType !== 'anthropic' && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text)" }}>接口格式</label>
-                      <select
+                      <CustomSelect
                         value={settings.apiFormat}
-                        onChange={(e) => setSettings(prev => normalizeAISettings({ ...prev, apiFormat: e.target.value }))}
-                        style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", fontSize: 13, outline: "none", color: "var(--text)", cursor: "pointer" }}
-                      >
-                        {(currentProvider?.supportedFormats || []).map((format) => (
-                          <option key={format} value={format}>
-                            {format === 'responses' ? 'Responses API' : format === 'chat_completions' ? 'Chat Completions API' : format}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(nextValue) => setSettings(prev => normalizeAISettings({ ...prev, apiFormat: nextValue }))}
+                        options={(currentProvider?.supportedFormats || []).map((format) => ({
+                          value: format,
+                          label: format === 'responses'
+                            ? 'Responses API'
+                            : format === 'chat_completions'
+                              ? 'Chat Completions API'
+                              : format,
+                        }))}
+                      />
                     </div>
                   )}
 
@@ -189,13 +313,11 @@ export default function Settings({ onBack }) {
                         style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", fontSize: 13, outline: "none", color: "var(--text)" }}
                       />
                     ) : (
-                      <select value={settings.model} onChange={(e) => setSettings(prev => ({ ...prev, model: e.target.value }))}
-                        style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", fontSize: 13, outline: "none", color: "var(--text)", cursor: "pointer" }}
-                      >
-                        {currentProvider?.models.map(model => (
-                          <option key={model} value={model}>{model}</option>
-                        ))}
-                      </select>
+                      <CustomSelect
+                        value={settings.model}
+                        onChange={(nextValue) => setSettings(prev => ({ ...prev, model: nextValue }))}
+                        options={(currentProvider?.models || []).map((model) => ({ value: model, label: model }))}
+                      />
                     )}
                   </div>
 
@@ -206,6 +328,27 @@ export default function Settings({ onBack }) {
                     <button onClick={handleSave} style={{ flex: 1, padding: "10px 0", borderRadius: 6, border: "1px solid var(--accent)", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 12px rgba(109,94,251,0.2)" }}>
                       {testStatus === 'saved' ? '已保存 ✓' : '保存配置'}
                     </button>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+                    <div style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)" }}>
+                      <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>配置存储</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: persistStatus === 'sqlite' ? '#00b894' : 'var(--text)' }}>
+                        {persistStatus === 'loading' ? '读取中...' : persistStatus === 'sqlite' ? 'SQLite 持久化' : '仅本地缓存'}
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
+                        最近保存: {formatTime(lastSavedAt)}
+                      </div>
+                    </div>
+                    <div style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)" }}>
+                      <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>连接状态</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: connectionState?.status === 'success' ? '#00b894' : connectionState?.status === 'error' ? '#e74c3c' : 'var(--text)' }}>
+                        {connectionState?.status === 'success' ? '已验证可用' : connectionState?.status === 'error' ? '验证失败' : '未验证'}
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
+                        最近验证: {formatTime(connectionState?.checkedAt)}
+                      </div>
+                    </div>
                   </div>
 
                   <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px dashed var(--line)', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -272,12 +415,14 @@ export default function Settings({ onBack }) {
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>OCR 返回格式</label>
-                        <select value={settings.ocrResponseMode} onChange={(e) => setSettings(prev => ({ ...prev, ocrResponseMode: e.target.value }))}
-                          style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)', fontSize: 13, outline: 'none', color: 'var(--text)', cursor: 'pointer' }}
-                        >
-                          <option value="json_questions">返回结构化题目 JSON</option>
-                          <option value="text">返回纯文本，再交给 AI 结构化</option>
-                        </select>
+                        <CustomSelect
+                          value={settings.ocrResponseMode}
+                          onChange={(nextValue) => setSettings(prev => ({ ...prev, ocrResponseMode: nextValue }))}
+                          options={[
+                            { value: 'json_questions', label: '返回结构化题目 JSON' },
+                            { value: 'text', label: '返回纯文本，再交给 AI 结构化' },
+                          ]}
+                        />
                       </div>
                     </div>
                   </div>
@@ -327,7 +472,7 @@ export default function Settings({ onBack }) {
                     <h4 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px 0", color: "var(--text)" }}>导出数据</h4>
                     <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>将所有题目和练习记录导出为可移植格式</p>
                   </div>
-                  <button style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>导出所有数据</button>
+                  <button onClick={handleExportAllData} style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>导出所有数据</button>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "20px", background: "rgba(231,76,60,0.05)", borderRadius: 12, border: "1px solid rgba(231,76,60,0.2)" }}>
@@ -338,7 +483,7 @@ export default function Settings({ onBack }) {
                     <h4 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px 0", color: "#e74c3c" }}>清空数据</h4>
                     <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>删除所有本地试题库、进度和记录。此操作不可恢复</p>
                   </div>
-                  <button style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "none", background: "#e74c3c", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>彻底清空数据</button>
+                  <button onClick={handleClearAllData} style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "none", background: "#e74c3c", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>彻底清空数据</button>
                 </div>
               </div>
             </div>

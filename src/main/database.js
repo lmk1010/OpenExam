@@ -142,6 +142,35 @@ function initDatabase() {
       last_review TEXT,
       FOREIGN KEY (question_id) REFERENCES questions(id)
     );
+
+    -- 应用设置表（持久化 AI 配置等）
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- AI 聊天会话
+    CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      provider TEXT,
+      model TEXT,
+      message_count INTEGER DEFAULT 0,
+      last_message_at TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- AI 聊天消息
+    CREATE TABLE IF NOT EXISTS ai_chat_messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (session_id) REFERENCES ai_chat_sessions(id)
+    );
   `);
 
   ensurePracticeRecordsSchema();
@@ -291,9 +320,10 @@ function addWrongQuestion(questionId, paperId, userAnswer, correctAnswer) {
 // 获取错题列表
 function getWrongQuestions() {
   return db.prepare(`
-    SELECT wq.*, q.content, q.options, q.analysis, q.category
+    SELECT wq.*, q.content, q.options, q.analysis, q.category, q.sub_category, q.answer, p.title AS paper_title
     FROM wrong_questions wq
     LEFT JOIN questions q ON wq.question_id = q.id
+    LEFT JOIN papers p ON wq.paper_id = p.id
     ORDER BY wq.added_at DESC
   `).all().map(row => ({
     ...row,
@@ -380,6 +410,39 @@ function getPracticeStats() {
   };
 }
 
+function normalizeQuestionType(type) {
+  const value = String(type || '').toLowerCase();
+  if (['single', 'multiple', 'judge'].includes(value)) return value;
+  return 'single';
+}
+
+function normalizeQuestionOptions(options) {
+  if (Array.isArray(options)) {
+    return options
+      .filter((option) => option && typeof option === 'object')
+      .map((option, index) => ({
+        key: String(option.key || String.fromCharCode(65 + index)).toUpperCase(),
+        content: String(option.content || ''),
+      }));
+  }
+
+  if (typeof options === 'string') {
+    try {
+      const parsed = JSON.parse(options);
+      return normalizeQuestionOptions(parsed);
+    } catch (error) {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function normalizeQuestionTags(tags) {
+  if (Array.isArray(tags)) return tags.map((tag) => String(tag).trim()).filter(Boolean).join(',');
+  return String(tags || '').trim();
+}
+
 // 导入试卷和题目
 function importPaper(paperData, questions) {
   const paperId = `paper_${Date.now()}`;
@@ -411,19 +474,21 @@ function importPaper(paperData, questions) {
     // 插入题目
     questions.forEach((q, index) => {
       const questionId = `q_${Date.now()}_${index}`;
+      const options = normalizeQuestionOptions(q.options);
+      const difficulty = Math.max(1, Math.min(5, Number(q.difficulty) || 2));
       insertQuestion.run(
         questionId,
         paperId,
         index + 1,
-        'single',
+        normalizeQuestionType(q.type),
         q.category || 'yanyu',
-        q.subCategory || '',
-        q.content,
-        JSON.stringify(q.options),
-        q.answer,
+        q.subCategory || q.sub_category || '',
+        String(q.content || ''),
+        JSON.stringify(options),
+        String(q.answer || '').trim().toUpperCase(),
         q.analysis || '',
-        2,
-        ''
+        difficulty,
+        normalizeQuestionTags(q.tags)
       );
     });
   });
@@ -658,6 +723,213 @@ function getGrowthData() {
   };
 }
 
+function getAppSetting(key) {
+  const row = db.prepare('SELECT value, updated_at FROM app_settings WHERE key = ?').get(key);
+  if (!row) return null;
+  return row;
+}
+
+function setAppSetting(key, value) {
+  db.prepare(`
+    INSERT INTO app_settings (key, value, updated_at)
+    VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET
+      value = excluded.value,
+      updated_at = CURRENT_TIMESTAMP
+  `).run(key, value);
+  return getAppSetting(key);
+}
+
+function getAISettings() {
+  const row = getAppSetting('ai_settings');
+  if (!row?.value) return null;
+  try {
+    return JSON.parse(row.value);
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveAISettings(settings) {
+  const payload = JSON.stringify(settings && typeof settings === 'object' ? settings : {});
+  const row = setAppSetting('ai_settings', payload);
+  return {
+    success: true,
+    updatedAt: row?.updated_at || new Date().toISOString(),
+  };
+}
+
+function getAIConnectionState() {
+  const row = getAppSetting('ai_connection_state');
+  if (!row?.value) return null;
+  try {
+    return JSON.parse(row.value);
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveAIConnectionState(state) {
+  const payload = JSON.stringify(state && typeof state === 'object' ? state : {});
+  const row = setAppSetting('ai_connection_state', payload);
+  return {
+    success: true,
+    updatedAt: row?.updated_at || new Date().toISOString(),
+  };
+}
+
+function createAIChatSession(input = {}) {
+  const id = String(input.id || `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+  const title = String(input.title || '新会话').trim() || '新会话';
+  const provider = String(input.provider || '').trim() || null;
+  const model = String(input.model || '').trim() || null;
+
+  db.prepare(`
+    INSERT INTO ai_chat_sessions (id, title, provider, model, message_count, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `).run(id, title, provider, model);
+
+  return db.prepare('SELECT * FROM ai_chat_sessions WHERE id = ?').get(id);
+}
+
+function getAIChatSessions(limit = 30) {
+  const count = Math.max(1, Math.min(200, Number(limit) || 30));
+  return db.prepare(`
+    SELECT * FROM ai_chat_sessions
+    ORDER BY COALESCE(last_message_at, created_at) DESC, updated_at DESC
+    LIMIT ?
+  `).all(count);
+}
+
+function getAIChatMessages(sessionId, limit = 300) {
+  const id = String(sessionId || '').trim();
+  if (!id) return [];
+  const count = Math.max(1, Math.min(2000, Number(limit) || 300));
+  return db.prepare(`
+    SELECT * FROM ai_chat_messages
+    WHERE session_id = ?
+    ORDER BY created_at ASC, rowid ASC
+    LIMIT ?
+  `).all(id, count);
+}
+
+function addAIChatMessage(input = {}) {
+  const id = String(input.id || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+  const sessionId = String(input.sessionId || '').trim();
+  const role = String(input.role || 'assistant').trim();
+  const content = String(input.content || '').trim();
+
+  if (!sessionId) throw new Error('sessionId 不能为空');
+  if (!content) throw new Error('content 不能为空');
+
+  db.prepare(`
+    INSERT INTO ai_chat_messages (id, session_id, role, content, created_at)
+    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+  `).run(id, sessionId, role, content);
+
+  db.prepare(`
+    UPDATE ai_chat_sessions
+    SET
+      updated_at = CURRENT_TIMESTAMP,
+      last_message_at = CURRENT_TIMESTAMP,
+      message_count = (
+        SELECT COUNT(*) FROM ai_chat_messages WHERE session_id = ?
+      )
+    WHERE id = ?
+  `).run(sessionId, sessionId);
+
+  return db.prepare('SELECT * FROM ai_chat_messages WHERE id = ?').get(id);
+}
+
+function renameAIChatSession(sessionId, title) {
+  const id = String(sessionId || '').trim();
+  const nextTitle = String(title || '').trim();
+  if (!id || !nextTitle) return null;
+  db.prepare(`
+    UPDATE ai_chat_sessions
+    SET title = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(nextTitle, id);
+  return db.prepare('SELECT * FROM ai_chat_sessions WHERE id = ?').get(id);
+}
+
+function deleteAIChatSession(sessionId) {
+  const id = String(sessionId || '').trim();
+  if (!id) return { success: false };
+
+  db.transaction(() => {
+    db.prepare('DELETE FROM ai_chat_messages WHERE session_id = ?').run(id);
+    db.prepare('DELETE FROM ai_chat_sessions WHERE id = ?').run(id);
+  })();
+
+  return { success: true };
+}
+
+function exportAllData() {
+  const safeParseJSON = (value, fallback) => {
+    try {
+      return JSON.parse(value);
+    } catch (error) {
+      return fallback;
+    }
+  };
+
+  const papers = db.prepare('SELECT * FROM papers ORDER BY year DESC, created_at DESC').all();
+  const questions = db.prepare('SELECT * FROM questions ORDER BY paper_id, order_num ASC').all().map((row) => ({
+    ...row,
+    options: safeParseJSON(row.options, []),
+    tags: row.tags ? row.tags.split(',').filter(Boolean) : [],
+  }));
+  const practiceRecords = db.prepare('SELECT * FROM practice_records ORDER BY start_time DESC').all().map((row) => ({
+    ...row,
+    answers: safeParseJSON(row.answers, {}),
+  }));
+  const wrongQuestions = db.prepare('SELECT * FROM wrong_questions ORDER BY added_at DESC').all();
+  const appSettings = db.prepare('SELECT * FROM app_settings ORDER BY updated_at DESC').all();
+  const aiChatSessions = db.prepare('SELECT * FROM ai_chat_sessions ORDER BY updated_at DESC').all();
+  const aiChatMessages = db.prepare('SELECT * FROM ai_chat_messages ORDER BY created_at ASC').all();
+
+  return {
+    version: 1,
+    exported_at: new Date().toISOString(),
+    stats: {
+      papers: papers.length,
+      questions: questions.length,
+      practice_records: practiceRecords.length,
+      wrong_questions: wrongQuestions.length,
+      app_settings: appSettings.length,
+      ai_chat_sessions: aiChatSessions.length,
+      ai_chat_messages: aiChatMessages.length,
+    },
+    data: {
+      papers,
+      questions,
+      practice_records: practiceRecords,
+      wrong_questions: wrongQuestions,
+      app_settings: appSettings,
+      ai_chat_sessions: aiChatSessions,
+      ai_chat_messages: aiChatMessages,
+    },
+  };
+}
+
+function clearAllData() {
+  db.transaction(() => {
+    db.prepare('DELETE FROM wrong_questions').run();
+    db.prepare('DELETE FROM practice_records').run();
+    db.prepare('DELETE FROM questions').run();
+    db.prepare('DELETE FROM papers').run();
+    db.prepare('DELETE FROM ai_chat_messages').run();
+    db.prepare('DELETE FROM ai_chat_sessions').run();
+    db.prepare('DELETE FROM app_settings').run();
+  })();
+
+  return {
+    success: true,
+    cleared_at: new Date().toISOString(),
+  };
+}
+
 // 关闭数据库
 function closeDatabase() {
   if (db) {
@@ -686,5 +958,17 @@ module.exports = {
   getHeatmapData,
   getAchievements,
   getGrowthData,
+  getAISettings,
+  saveAISettings,
+  getAIConnectionState,
+  saveAIConnectionState,
+  createAIChatSession,
+  getAIChatSessions,
+  getAIChatMessages,
+  addAIChatMessage,
+  renameAIChatSession,
+  deleteAIChatSession,
+  exportAllData,
+  clearAllData,
   closeDatabase
 };

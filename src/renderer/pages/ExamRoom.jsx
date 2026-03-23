@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import RichQuestionContent from '../components/RichQuestionContent.jsx';
 import { getState, actions } from '../store/examStore.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -195,7 +196,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
             <span style={{ width: 22, height: 22, borderRadius: 5, flexShrink: 0, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, background: tagBg, color: tagCol, transition: 'all 0.18s' }}>
               {opt.key}
             </span>
-            <span style={{ fontSize: 13, lineHeight: 1.65, color: 'var(--text)', paddingTop: 1 }}>{opt.content}</span>
+            <RichQuestionContent value={opt.content} className="rich-question-option" style={{ fontSize: 13, lineHeight: 1.65, color: 'var(--text)', paddingTop: 1, flex: 1 }} />
           </button>
         );
       })}
@@ -221,10 +222,10 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
             正确答案：<span style={{ color: 'var(--accent)', fontWeight: 700 }}>{currentQuestion.answer}</span>
           </span>
         </div>
-        {currentQuestion.analysis && (
+        {(currentQuestion.analysis_html || currentQuestion.analysis) && (
           <div style={{ fontSize: 12, lineHeight: 1.75, color: 'var(--muted)' }}>
-            <strong style={{ color: 'var(--text)', fontWeight: 600 }}>解析：</strong>
-            {currentQuestion.analysis}
+            <strong style={{ color: 'var(--text)', fontWeight: 600, display: 'block', marginBottom: 6 }}>解析：</strong>
+            <RichQuestionContent value={currentQuestion.analysis_html || currentQuestion.analysis} className="rich-question-analysis" />
           </div>
         )}
       </div>
@@ -427,11 +428,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
 
               {/* Question text */}
               <div style={{ padding: '20px 20px 22px' }}>
-                <div style={{ fontSize: 14, lineHeight: 1.85, color: 'var(--text)', fontWeight: 500, letterSpacing: '0.15px', userSelect: 'text' }}>
-                  {currentQuestion.content.split('\n').map((line, i) => (
-                    <p key={i} style={{ margin: '0 0 10px', textAlign: 'justify' }}>{line}</p>
-                  ))}
-                </div>
+                <RichQuestionContent value={currentQuestion.content_html || currentQuestion.content} style={{ fontSize: 14, lineHeight: 1.85, color: 'var(--text)', fontWeight: 500, letterSpacing: '0.15px', userSelect: 'text' }} />
               </div>
             </div>
 

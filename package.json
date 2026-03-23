@@ -12,7 +12,8 @@
     "dist": "npm run build && electron-builder",
     "dist:mac": "npm run build && electron-builder --mac dmg zip",
     "dist:win": "npm run build && electron-builder --win nsis",
-    "rebuild:electron": "electron-builder install-app-deps"
+    "rebuild:electron": "electron-builder install-app-deps",
+    "localize:saduck-assets": "node scripts/localize-saduck-assets.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.72.1",
@@ -81,7 +82,16 @@
         "releaseType": "release"
       }
     ],
-    "electronUpdaterCompatibility": ">=2.16"
+    "electronUpdaterCompatibility": ">=2.16",
+    "extraResources": [
+      {
+        "from": "data/question-assets",
+        "to": "question-assets",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
   },
   "description": "OpenExam desktop AI learning platform",
   "author": "lmk1010"

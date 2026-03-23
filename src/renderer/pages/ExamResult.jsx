@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import RichQuestionContent from '../components/RichQuestionContent.jsx';
 import { getState } from '../store/examStore.js';
 
 const categoryNames = {
@@ -190,11 +191,7 @@ export default function ExamResult({ result, onBack }) {
             <span>正确答案: <strong className="correct">{currentQuestion.answer}</strong></span>
           </div>
 
-          <div className="question-content">
-            {currentQuestion.content.split('\n').map((line, index) => (
-              <p key={index}>{line}</p>
-            ))}
-          </div>
+          <RichQuestionContent value={currentQuestion.content_html || currentQuestion.content} className="question-content" />
 
           <div className="question-options review">
             {currentQuestion.options.map(opt => (
@@ -203,15 +200,15 @@ export default function ExamResult({ result, onBack }) {
                 className={`option-item ${opt.key === currentQuestion.answer ? 'correct-answer' : ''} ${opt.key === userAnswer && !isCorrect ? 'wrong-answer' : ''}`}
               >
                 <span className="option-key">{opt.key}</span>
-                <span className="option-content">{opt.content}</span>
+                <RichQuestionContent value={opt.content} className="option-content rich-question-option" />
               </div>
             ))}
           </div>
 
-          {currentQuestion.analysis && (
+          {(currentQuestion.analysis_html || currentQuestion.analysis) && (
             <div className="analysis-box">
               <h4>解析</h4>
-              <p>{currentQuestion.analysis}</p>
+              <RichQuestionContent value={currentQuestion.analysis_html || currentQuestion.analysis} className="rich-question-analysis" />
             </div>
           )}
         </div>

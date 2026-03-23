@@ -1,16 +1,18 @@
-/**
- * 爬取 saduck.top 试卷数据
- */
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { localizePapers } = require('./saduck-assets');
 
-const TOKEN = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ2aXBFbmRUaW1lIjoiMTc2OTM5MTA0MDcxNCIsInNpZ24iOiI1MDIwODI1NjYxIiwidmlwVHlwZSI6IjEiLCJ2aXBTdGFydFRpbWUiOiIxNzY5MTMxODQwNzE0IiwiZXhwIjoxNzcwODU5ODQwLCJlbWFpbCI6InpteGxpejk5MTQzbUBvdXRsb29rLmNvbSJ9.nA2IHHH0iemhUXX_Vvdo_YVwkWDCtCVsKhSxN5SsJXc';
-const AES_KEY_DECRYPT = '7SyqrN6925ZYb636';  // 解密试卷列表
-const AES_KEY_ENCRYPT = 'kxZ17XQ8z6957n3S';  // 加密请求ID
+const TOKEN = process.env.SADUCK_TOKEN || '';
+const AES_KEY_DECRYPT = '7SyqrN6925ZYb636';
+const AES_KEY_ENCRYPT = 'kxZ17XQ8z6957n3S';
 const BASE_URL = 'https://saduck.top/api';
+const ORIGIN = 'https://saduck.top';
+const REFERER = 'https://saduck.top/questionBank/overTheYears.html';
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36';
+const REQUEST_DELAY = Math.max(100, Number(process.env.SADUCK_DELAY_MS) || 250);
+const MAX_PER_GROUP = Math.max(0, Number(process.env.SADUCK_MAX_PER_GROUP) || 0);
 
-// AES 解密 (试卷列表)
 function decrypt(encrypted) {
   const decipher = crypto.createDecipheriv('aes-128-ecb', AES_KEY_DECRYPT, null);
   let decrypted = decipher.update(encrypted, 'base64', 'utf8');
@@ -18,140 +20,185 @@ function decrypt(encrypted) {
   return JSON.parse(decrypted);
 }
 
-// AES 加密 (请求ID) - URL安全base64
 function encryptId(text) {
   const cipher = crypto.createCipheriv('aes-128-ecb', AES_KEY_ENCRYPT, null);
   let encrypted = cipher.update(String(text), 'utf8', 'base64');
   encrypted += cipher.final('base64');
-  // 转换为URL安全的base64
   return encrypted.replace(/\//g, '_').replace(/\+/g, '-');
 }
 
-// 获取试卷列表
+function normalizeHtml(value) {
+  let html = String(value || '').trim();
+  if (!html) return '';
+  html = html.replace(/src=(['"])\/\//gi, 'src=$1https://');
+  html = html.replace(/src=(['"])\/(?!\/)/gi, `src=$1${ORIGIN}/`);
+  html = html.replace(/href=(['"])\/\//gi, 'href=$1https://');
+  html = html.replace(/href=(['"])\/(?!\/)/gi, `href=$1${ORIGIN}/`);
+  return html;
+}
+
+function toPlainText(value) {
+  return String(value || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\r/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function splitOptions(value) {
+  if (Array.isArray(value)) return value;
+  return String(value || '').split('#');
+}
+
+function convertAnswer(value) {
+  const indexes = String(value || '')
+    .split(/[^0-9]+/)
+    .filter(Boolean)
+    .map((item) => Number(item))
+    .filter((item) => Number.isInteger(item) && item >= 0);
+  return indexes.map((index) => String.fromCharCode(65 + index)).join('');
+}
+
 async function getPaperList() {
   const res = await fetch(`${BASE_URL}/tk/itemizes?type=1`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      accept: 'application/json, text/plain, */*',
+      'content-type': 'application/json',
+      origin: ORIGIN,
+      referer: REFERER,
+      'user-agent': USER_AGENT,
+    },
     body: '{}'
   });
   const json = await res.json();
-  if (json.code === 0) {
-    return decrypt(json.result);
-  }
-  throw new Error(json.message);
+  if (json.code === 0) return decrypt(json.result);
+  throw new Error(json.message || '获取试卷列表失败');
 }
 
-// 获取题目详情
 async function getQuestions(sid) {
-  const encryptedId = encryptId(sid);
+  if (!TOKEN) throw new Error('缺少 SADUCK_TOKEN 环境变量');
   const res = await fetch(`${BASE_URL}/tk/sourceInfo`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      'token': TOKEN
+      accept: 'application/json, text/plain, */*',
+      'content-type': 'application/json',
+      origin: ORIGIN,
+      referer: REFERER,
+      token: TOKEN,
+      'user-agent': USER_AGENT,
     },
-    body: JSON.stringify({ id: encryptedId })
+    body: JSON.stringify({ id: encryptId(sid) })
   });
   const json = await res.json();
-  if (json.code === 0) {
-    return json.result; // 题目数据未加密
-  }
+  if (json.code === 0) return Array.isArray(json.result) ? json.result : [];
   throw new Error(json.message || `获取题目失败: ${sid}`);
 }
 
-// 转换题目格式
-function convertQuestion(q, orderNum) {
-  const options = q.options.split('#').map((opt, i) => ({
-    key: String.fromCharCode(65 + i), // A, B, C, D
-    content: opt
-  }));
-
-  // 正确答案转换 (0->A, 1->B, 2->C, 3->D)
-  const answerIndex = parseInt(q.correctAnswer);
-  const answer = String.fromCharCode(65 + answerIndex);
-
-  return {
-    id: `q_saduck_${q.id}`,
-    order_num: orderNum,
-    type: q.type === 'single' ? 'single' : 'multiple',
-    category: mapCategory(q.tag),
-    sub_category: q.tag || '',
-    content: q.title.replace(/<br>/g, '\n').replace(/<[^>]+>/g, ''),
-    options: options,
-    answer: answer,
-    analysis: (q.analysis || '').replace(/<br>/g, '\n').replace(/<[^>]+>/g, ''),
-    difficulty: Math.round((parseFloat(q.globalAccuracy) || 50) / 20), // 转换为1-5
-    source: q.source || ''
-  };
-}
-
-// 分类映射
 function mapCategory(tag) {
   const map = {
-    '理论政策': 'zhengzhi',
-    '法律': 'changshi',
-    '经济': 'changshi',
-    '人文历史': 'changshi',
-    '历史': 'changshi',
-    '自然科技': 'changshi',
-    '经济利润': 'shuliang',
-    '和差倍比': 'shuliang',
-    '最值问题': 'shuliang',
-    '排列组合': 'shuliang'
+    理论政策: 'zhengzhi',
+    法律: 'changshi',
+    经济: 'changshi',
+    人文历史: 'changshi',
+    历史: 'changshi',
+    自然科技: 'changshi',
+    经济利润: 'shuliang',
+    和差倍比: 'shuliang',
+    最值问题: 'shuliang',
+    排列组合: 'shuliang'
   };
   return map[tag] || 'changshi';
 }
 
-// 延迟函数
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+function convertQuestion(q, orderNum) {
+  const contentHtml = normalizeHtml(q.title || '');
+  const analysisHtml = normalizeHtml(q.analysis || '');
+  const answer = convertAnswer(q.correctAnswer);
+  const options = splitOptions(q.options).map((opt, index) => {
+    const normalized = normalizeHtml(opt);
+    return {
+      key: String.fromCharCode(65 + index),
+      content: normalized || toPlainText(opt)
+    };
+  }).filter((opt) => opt.content);
 
-// 主函数
+  return {
+    id: `q_saduck_${q.id}`,
+    order_num: orderNum,
+    type: String(q.type || '').toLowerCase().includes('multi') || answer.length > 1 ? 'multiple' : 'single',
+    category: mapCategory(q.tag),
+    sub_category: q.tag || '',
+    content: toPlainText(contentHtml),
+    content_html: contentHtml || null,
+    options,
+    answer,
+    analysis: toPlainText(analysisHtml),
+    analysis_html: analysisHtml || null,
+    difficulty: Math.max(1, Math.min(5, Math.round((parseFloat(q.globalAccuracy) || 50) / 20))),
+    source: q.source || '',
+    source_question_id: q.id,
+  };
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function main() {
-  console.log('开始爬取试卷数据...\n');
-
-  // 获取试卷列表
+  console.log('开始爬取 saduck 题库...\n');
   const paperGroups = await getPaperList();
-  console.log(`共 ${paperGroups.length} 个分组\n`);
-
+  const seen = new Set();
   const allPapers = [];
 
   for (const group of paperGroups) {
     console.log(`\n=== ${group.title} ===`);
+    const sources = Array.isArray(group.tkSources) ? group.tkSources : [];
+    const list = MAX_PER_GROUP > 0 ? sources.slice(0, MAX_PER_GROUP) : sources;
 
-    for (const paper of group.tkSources.slice(0, 3)) { // 每组最多3套
+    for (const paper of list) {
+      if (!paper?.sid || seen.has(paper.sid)) continue;
+      seen.add(paper.sid);
       console.log(`  爬取: ${paper.source}`);
-
       try {
         const questions = await getQuestions(paper.sid);
-
-        const paperData = {
+        const converted = questions.map((q, index) => convertQuestion(q, index + 1));
+        allPapers.push({
           id: `paper_saduck_${paper.sid}`,
-          title: paper.source.trim(),
-          year: parseInt(paper.source.match(/\d{4}/)?.[0]) || 2024,
+          title: String(paper.source || '').trim(),
+          year: parseInt(String(paper.source || '').match(/\d{4}/)?.[0], 10) || 2024,
           type: group.title === '国考' ? 'national' : 'provincial',
           province: group.title === '国考' ? null : group.title,
-          question_count: questions.length,
+          question_count: converted.length,
           difficulty: parseFloat(paper.difficulty) || 4,
-          questions: questions.map((q, i) => convertQuestion(q, i + 1))
-        };
-
-        allPapers.push(paperData);
-        console.log(`    ✓ ${questions.length} 题`);
-
-        await sleep(500); // 避免请求过快
-      } catch (err) {
-        console.log(`    ✗ 失败: ${err.message}`);
+          questions: converted,
+        });
+        console.log(`    ✓ ${converted.length} 题`);
+        await sleep(REQUEST_DELAY);
+      } catch (error) {
+        console.log(`    ✗ 失败: ${error.message}`);
       }
     }
   }
 
-  // 保存数据
+  console.log('\n开始本地化题图资源...');
+  const localized = await localizePapers(allPapers);
+  console.log(`题图本地化完成: ${localized.assetCount} 个资源${localized.failed.length ? `，失败 ${localized.failed.length} 个` : ''}`);
+
   const outputPath = path.join(__dirname, '../data/saduck-papers.json');
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, JSON.stringify(allPapers, null, 2));
 
-  console.log(`\n完成! 共爬取 ${allPapers.length} 套试卷`);
-  console.log(`数据保存至: ${outputPath}`);
+  console.log(`\n完成，共保存 ${allPapers.length} 套试卷`);
+  console.log(`输出文件: ${outputPath}`);
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

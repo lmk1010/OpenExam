@@ -11,6 +11,19 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function renderRichHtml(value) {
+  const input = String(value || '').trim();
+  if (!input) return '';
+  if (!/<[^>]+>/.test(input)) return escapeHtml(input).replace(/\n/g, '<br/>');
+  return input
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+=("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/src=(['"])\/\//gi, 'src=$1https://')
+    .replace(/src=(['"])\/(?!\/)/gi, 'src=$1https://saduck.top/')
+    .replace(/href=(['"])\/\//gi, 'href=$1https://')
+    .replace(/href=(['"])\/(?!\/)/gi, 'href=$1https://saduck.top/');
+}
+
 function safeFilename(value = 'openexam-paper') {
   return String(value || 'openexam-paper')
     .trim()
@@ -47,9 +60,11 @@ function normalizePayload(payload = {}) {
       id: question.id || `q_${index + 1}`,
       order_num: Number(question.order_num || index + 1),
       content: String(question.content || '').trim(),
+      content_html: String(question.content_html || question.contentHtml || '').trim(),
       options: normalizeOptions(question.options),
       answer: String(question.answer || '').trim(),
       analysis: String(question.analysis || '').trim(),
+      analysis_html: String(question.analysis_html || question.analysisHtml || '').trim(),
       category: String(question.category || ''),
       type: String(question.type || 'single'),
     })),
@@ -63,12 +78,12 @@ function renderQuestion(question, index) {
         <span class="question-index">${index + 1}</span>
         <span class="question-type">${escapeHtml(question.category || '综合')}</span>
       </div>
-      <div class="question-content">${escapeHtml(question.content).replace(/\n/g, '<br/>')}</div>
+      <div class="question-content rich-html">${renderRichHtml(question.content_html || question.content)}</div>
       <div class="option-list">
         ${question.options.map((option) => `
           <div class="option-item">
             <span class="option-key">${escapeHtml(option.key)}</span>
-            <span>${escapeHtml(option.content)}</span>
+            <span class="rich-html">${renderRichHtml(option.content)}</span>
           </div>
         `).join('')}
       </div>
@@ -83,7 +98,7 @@ function renderAnswer(question, index) {
         <span>第 ${index + 1} 题</span>
         <span>答案：${escapeHtml(question.answer || '-')}</span>
       </div>
-      ${question.analysis ? `<div class="answer-analysis">${escapeHtml(question.analysis).replace(/\n/g, '<br/>')}</div>` : ''}
+      ${(question.analysis_html || question.analysis) ? `<div class="answer-analysis rich-html">${renderRichHtml(question.analysis_html || question.analysis)}</div>` : ''}
     </article>
   `;
 }
@@ -121,6 +136,12 @@ function buildPaperHtml(payload) {
       .option-key { font-weight: 800; color: #4f46e5; }
       .answer-head { font-weight: 700; color: #111827; }
       .answer-analysis { padding-top: 10px; border-top: 1px dashed #d1d5db; color: #4b5563; }
+      .rich-html p { margin: 0 0 8px; }
+      .rich-html p:last-child { margin-bottom: 0; }
+      .rich-html img { display: block; max-width: min(100%, 560px); height: auto; margin: 8px 0; border-radius: 10px; }
+      .rich-html table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px; }
+      .rich-html th, .rich-html td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: center; }
+      .rich-html th { background: #f8fafc; }
       .footer-note { margin-top: 10mm; color: #9ca3af; font-size: 11px; text-align: center; }
       .page-break { page-break-before: always; }
     </style>

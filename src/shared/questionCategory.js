@@ -67,7 +67,14 @@ function inferByRules(text, rules = []) {
 function inferCategoryFromContent(content) { return inferByRules(normalizeText(content), CATEGORY_RULES); }
 function inferSubCategoryFromContent(category, content) { return inferByRules(normalizeText(content), SUBCATEGORY_RULES[category] || []); }
 function isFakeQuestionContent(content) { const text = trimText(content); return !text || text === '<' || FAKE_QUESTION_PATTERNS.some((pattern) => text.includes(pattern)); }
-function isFakeQuestion(question = {}) { return isFakeQuestionContent(question.content); }
+function hasQuestionHtmlContent(content) {
+  const html = trimText(content);
+  return /<img/i.test(html) || /<svg/i.test(html) || /<table/i.test(html);
+}
+function isFakeQuestion(question = {}) {
+  if (hasQuestionHtmlContent(question.content_html || question.contentHtml)) return false;
+  return isFakeQuestionContent(question.content);
+}
 function normalizeQuestionTaxonomy(question = {}) {
   const rawCategory = trimText(question.category);
   const rawSubCategory = trimText(question.subCategory || question.sub_category);

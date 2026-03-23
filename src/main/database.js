@@ -132,6 +132,28 @@ function ensureWrongQuestionsSchema() {
   `).run();
 }
 
+function ensureQuestionsSchema() {
+  const columns = db.pragma('table_info(questions)');
+  if (!Array.isArray(columns) || !columns.length) return;
+
+  const byName = new Set(columns.map((column) => column.name));
+  const additions = [
+    ['content_html', 'TEXT'],
+    ['analysis_html', 'TEXT'],
+  ];
+
+  additions.forEach(([name, definition]) => {
+    if (!byName.has(name)) {
+      db.prepare(`ALTER TABLE questions ADD COLUMN ${name} ${definition}`).run();
+    }
+  });
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_questions_paper_id ON questions(paper_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_questions_paper_order_unique ON questions(paper_id, order_num);
+  `);
+}
+
 // 初始化数据库
 function initDatabase() {
   const userDataPath = app.getPath('userData');
@@ -165,9 +187,11 @@ function initDatabase() {
       category TEXT,
       sub_category TEXT,
       content TEXT NOT NULL,
+      content_html TEXT,
       options TEXT NOT NULL,
       answer TEXT NOT NULL,
       analysis TEXT,
+      analysis_html TEXT,
       difficulty INTEGER DEFAULT 2,
       tags TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -239,6 +263,7 @@ function initDatabase() {
 
   ensurePracticeRecordsSchema();
   ensureWrongQuestionsSchema();
+  ensureQuestionsSchema();
 
   // 插入示例数据（如果表为空）
   const count = db.prepare('SELECT COUNT(*) as count FROM papers').get();
@@ -412,7 +437,7 @@ function hydrateWrongQuestionRow(row) {
 // 获取错题列表
 function getWrongQuestionById(id) {
   const row = db.prepare(`
-    SELECT wq.*, q.content, q.options, q.analysis, q.category, q.sub_category, q.answer, p.title AS paper_title
+    SELECT wq.*, q.content, q.content_html, q.options, q.analysis, q.analysis_html, q.category, q.sub_category, q.answer, p.title AS paper_title
     FROM wrong_questions wq
     LEFT JOIN questions q ON wq.question_id = q.id
     LEFT JOIN papers p ON wq.paper_id = p.id
@@ -431,7 +456,7 @@ function getWrongQuestions(options = {}) {
   if (limitSql) params.push(Math.floor(limit));
 
   return db.prepare(`
-    SELECT wq.*, q.content, q.options, q.analysis, q.category, q.sub_category, q.answer, p.title AS paper_title
+    SELECT wq.*, q.content, q.content_html, q.options, q.analysis, q.analysis_html, q.category, q.sub_category, q.answer, p.title AS paper_title
     FROM wrong_questions wq
     LEFT JOIN questions q ON wq.question_id = q.id
     LEFT JOIN papers p ON wq.paper_id = p.id
@@ -637,8 +662,8 @@ function savePaperBundle(paperData = {}, questions = [], fallbackType = 'importe
   `);
 
   const insertQuestion = db.prepare(`
-    INSERT INTO questions (id, paper_id, order_num, type, category, sub_category, content, options, answer, analysis, difficulty, tags, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO questions (id, paper_id, order_num, type, category, sub_category, content, content_html, options, answer, analysis, analysis_html, difficulty, tags, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
   `);
 
   const saveTransaction = db.transaction(() => {
@@ -658,6 +683,8 @@ function savePaperBundle(paperData = {}, questions = [], fallbackType = 'importe
       const questionId = `q_${Date.now()}_${index}`;
       const options = normalizeQuestionOptions(q.options);
       const content = String(q.content || '');
+      const contentHtml = String(q.contentHtml || q.content_html || '');
+      const analysisHtml = String(q.analysisHtml || q.analysis_html || '');
       const taxonomy = normalizeQuestionTaxonomy({
         category: q.category || paperData.category || 'yanyu',
         subCategory: q.subCategory || q.sub_category || paperData.subCategory || '',
@@ -671,9 +698,11 @@ function savePaperBundle(paperData = {}, questions = [], fallbackType = 'importe
         taxonomy.category,
         taxonomy.subCategory,
         content,
+        contentHtml || null,
         JSON.stringify(options),
         String(q.answer || '').trim().toUpperCase(),
         q.analysis || '',
+        analysisHtml || null,
         Math.max(1, Math.min(5, Number(q.difficulty) || difficulty || 2)),
         normalizeQuestionTags(q.tags)
       );

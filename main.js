@@ -1,11 +1,23 @@
-const { app, BrowserWindow, nativeTheme, ipcMain, nativeImage } = require("electron");
+const { app, BrowserWindow, nativeTheme, ipcMain, nativeImage, protocol } = require("electron");
 const path = require("path");
 const database = require("./src/main/database.js");
 const paperExport = require("./src/main/paperExport.js");
 const updater = require("./src/main/updater.js");
+const questionAssets = require("./src/main/questionAssets.js");
 
 const APP_ICON_PATH = path.join(__dirname, "src", "renderer", "assets", "openexam-app-icon.png");
 const APP_ICON = nativeImage.createFromPath(APP_ICON_PATH);
+
+protocol.registerSchemesAsPrivileged([{
+  scheme: questionAssets.ASSET_SCHEME,
+  privileges: {
+    standard: true,
+    secure: true,
+    supportFetchAPI: true,
+    stream: true,
+    corsEnabled: true,
+  },
+}]);
 
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -66,6 +78,8 @@ app.whenReady().then(() => {
       app.dock.setIcon(APP_ICON);
     }
   }
+
+  questionAssets.registerProtocol();
 
   // 初始化数据库
   database.initDatabase();

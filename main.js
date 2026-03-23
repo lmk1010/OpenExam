@@ -1,7 +1,10 @@
-const { app, BrowserWindow, nativeTheme, ipcMain } = require("electron");
+const { app, BrowserWindow, nativeTheme, ipcMain, nativeImage } = require("electron");
 const path = require("path");
 const database = require("./src/main/database.js");
 const paperExport = require("./src/main/paperExport.js");
+
+const APP_ICON_PATH = path.join(__dirname, "src", "renderer", "assets", "openexam-app-icon.png");
+const APP_ICON = nativeImage.createFromPath(APP_ICON_PATH);
 
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -11,6 +14,7 @@ const createWindow = () => {
     minHeight: 580,
     backgroundColor: "#ffffff",
     show: false,
+    icon: APP_ICON_PATH,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 12, y: 22 },
     webPreferences: {
@@ -54,6 +58,13 @@ const createWindow = () => {
 
 app.whenReady().then(() => {
   nativeTheme.themeSource = "light";
+
+  if (!APP_ICON.isEmpty()) {
+    app.setName("OpenExam");
+    if (process.platform === "darwin" && app.dock?.setIcon) {
+      app.dock.setIcon(APP_ICON);
+    }
+  }
 
   // 初始化数据库
   database.initDatabase();

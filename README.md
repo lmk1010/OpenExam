@@ -31,8 +31,25 @@ npm install
 # 开发模式
 npm run dev
 
-# 构建
+# 构建前端
 npm run build
+
+# 本地打包 macOS
+npm run dist:mac
+
+# 本地打包 Windows
+npm run dist:win
+```
+
+## 📦 自动 Release 出包
+
+- 推送标签 `v*` 会自动触发 GitHub Actions
+- 自动构建 `macOS` 和 `Windows` 安装包
+- 自动把产物上传到 GitHub Release
+
+```bash
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 ## 📖 支持的学科

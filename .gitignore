@@ -21,3 +21,6 @@ npm-debug.log*
 # Environment
 .env
 .env.local
+
+# Desktop release output
+release/

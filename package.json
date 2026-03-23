@@ -7,7 +7,12 @@
     "dev": "concurrently -k \"vite\" \"wait-on http://localhost:5189 && VITE_DEV_SERVER_URL=http://localhost:5189 electron .\"",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "electron ."
+    "start": "electron .",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac dmg zip",
+    "dist:win": "npm run build && electron-builder --win nsis",
+    "rebuild:electron": "electron-builder install-app-deps"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.72.1",
@@ -22,8 +27,52 @@
     "@vitejs/plugin-react": "^4.3.1",
     "concurrently": "^8.2.2",
     "electron": "^30.0.2",
-    "electron-rebuild": "^3.2.9",
+    "electron-builder": "^26.8.1",
     "vite": "^5.4.8",
     "wait-on": "^7.2.0"
-  }
+  },
+  "build": {
+    "appId": "com.openexam.app",
+    "productName": "OpenExam",
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "preload.js",
+      "src/main/**/*",
+      "src/shared/**/*",
+      "src/renderer/assets/**/*",
+      "package.json"
+    ],
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "category": "public.app-category.education",
+      "icon": "build/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always"
+    }
+  },
+  "description": "OpenExam desktop AI learning platform",
+  "author": "lmk1010"
 }

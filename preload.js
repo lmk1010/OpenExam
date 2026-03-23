@@ -42,6 +42,10 @@ contextBridge.exposeInMainWorld("openexam", {
     clearAllData: () => ipcRenderer.invoke("db:clearAllData"),
   },
 
+  paper: {
+    exportPdf: (payload) => ipcRenderer.invoke("paper:exportPdf", payload),
+  },
+
   // AI API
   ai: {
     testConnection: (settings) => ipcRenderer.invoke("ai:testConnection", settings),

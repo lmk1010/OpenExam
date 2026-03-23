@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { actions } from '../store/examStore.js';
 import CustomSelect from '../components/CustomSelect.jsx';
+import { buildPaperShareText, copyText } from '../utils/paperShare.js';
 
 // 省份标签数据
 const PROVINCES = [
@@ -47,6 +48,8 @@ export default function PaperList({ onStartExam }) {
   const [selectedProvince, setSelectedProvince] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [busyAction, setBusyAction] = useState('');
 
   // 加载试卷
   useEffect(() => {
@@ -91,6 +94,39 @@ export default function PaperList({ onStartExam }) {
 
   const handleStart = async (paperId) => {
     onStartExam?.(paperId);
+  };
+
+  const handleExportPaper = async (paper) => {
+    if (!paper?.id || !window.openexam?.db?.getQuestions || !window.openexam?.paper?.exportPdf) return;
+    setBusyAction(`pdf:${paper.id}`);
+    setStatusMessage(null);
+    try {
+      const questions = await window.openexam.db.getQuestions(paper.id);
+      const result = await window.openexam.paper.exportPdf({ paper, questions });
+      if (result?.canceled) return;
+      if (result?.success) {
+        setStatusMessage({ type: 'success', text: `已导出 PDF：${result.filePath}` });
+      }
+    } catch (error) {
+      setStatusMessage({ type: 'error', text: error.message || 'PDF 导出失败' });
+    } finally {
+      setBusyAction('');
+    }
+  };
+
+  const handleSharePaper = async (paper) => {
+    if (!paper?.id || !window.openexam?.db?.getQuestions) return;
+    setBusyAction(`share:${paper.id}`);
+    setStatusMessage(null);
+    try {
+      const questions = await window.openexam.db.getQuestions(paper.id);
+      await copyText(buildPaperShareText({ paper, questions }));
+      setStatusMessage({ type: 'success', text: `已复制分享文案：${paper.title}` });
+    } catch (error) {
+      setStatusMessage({ type: 'error', text: error.message || '分享文案复制失败' });
+    } finally {
+      setBusyAction('');
+    }
   };
 
   if (loading) {
@@ -138,6 +174,12 @@ export default function PaperList({ onStartExam }) {
         </div>
       </div>
 
+      {statusMessage && (
+        <div style={{ marginBottom: 14, padding: '11px 14px', borderRadius: 14, border: statusMessage.type === 'error' ? '1px solid rgba(239,68,68,0.18)' : '1px solid rgba(16,185,129,0.18)', background: statusMessage.type === 'error' ? 'rgba(239,68,68,0.06)' : 'rgba(16,185,129,0.07)', color: statusMessage.type === 'error' ? '#b42318' : '#027a48', fontSize: 12, lineHeight: 1.6 }}>
+          {statusMessage.text}
+        </div>
+      )}
+
       {/* 试卷列表 */}
       <div className="paper-grid">
         {paginatedPapers.map(paper => (
@@ -156,9 +198,17 @@ export default function PaperList({ onStartExam }) {
                 {'★'.repeat(paper.difficulty || 3)}{'☆'.repeat(5 - (paper.difficulty || 3))}
               </span>
             </div>
-            <button className="paper-start-btn" onClick={() => handleStart(paper.id)}>
-              开始答题
-            </button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, marginTop: 14 }}>
+              <button className="paper-start-btn" onClick={() => handleStart(paper.id)} style={{ margin: 0 }}>
+                开始答题
+              </button>
+              <button onClick={() => handleExportPaper(paper)} disabled={busyAction === `pdf:${paper.id}`} style={{ padding: '0 12px', borderRadius: 12, border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: busyAction ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
+                {busyAction === `pdf:${paper.id}` ? '导出中...' : 'PDF'}
+              </button>
+              <button onClick={() => handleSharePaper(paper)} disabled={busyAction === `share:${paper.id}`} style={{ padding: '0 12px', borderRadius: 12, border: '1px solid rgba(109,94,251,0.18)', background: 'rgba(109,94,251,0.08)', color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: busyAction ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
+                {busyAction === `share:${paper.id}` ? '复制中...' : '分享'}
+              </button>
+            </div>
           </div>
         ))}
       </div>

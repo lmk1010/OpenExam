@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { getAISettings, isAIConfigured } from "../store/aiSettings.js";
+import { buildPaperShareText, copyText } from "../utils/paperShare.js";
 
 const CATEGORIES = [
   { key: "yanyu", name: "言语理解" }, { key: "shuliang", name: "数量关系" },
@@ -47,6 +48,7 @@ export default function AIGenerate({ onStartExam }) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [historyPapers, setHistoryPapers] = useState([]);
+  const [actionBusy, setActionBusy] = useState("");
   const progressTimerRef = useRef(null);
   const startedAtRef = useRef(0);
   const generationTokenRef = useRef(0);
@@ -155,8 +157,14 @@ export default function AIGenerate({ onStartExam }) {
     finishWithError("已取消本次生成，请调整参数后重试。", "已取消", "warning");
   };
 
+  const getGeneratedPaperPayload = () => ({
+    paper: { title: generated?.title || "AI 智能试卷", year: new Date().getFullYear(), duration: Math.max(20, (generated?.count || 0) * 2), type: "custom", subject: "xingce", question_count: generated?.count || 0, difficulty: config.difficulty },
+    questions: generated?.questions || [],
+  });
+
   const handleSave = async () => {
     if (!generated?.questions?.length || !window.openexam?.db) return;
+    setActionBusy("save");
     try {
       const r = await window.openexam.db.importPaper({ title: generated.title, year: new Date().getFullYear() }, generated.questions);
       pushFeedback("success", `已导入题库：${r.questionCount} 道题。`);
@@ -167,6 +175,34 @@ export default function AIGenerate({ onStartExam }) {
     } catch (e) {
       pushFeedback("error", `保存失败：${e.message || "未知错误"}`);
       alert("保存失败: " + e.message);
+    } finally {
+      setActionBusy("");
+    }
+  };
+
+  const handleExportGeneratedPdf = async () => {
+    if (!generated?.questions?.length || !window.openexam?.paper?.exportPdf) return;
+    setActionBusy("pdf");
+    try {
+      const result = await window.openexam.paper.exportPdf(getGeneratedPaperPayload());
+      if (result?.success) pushFeedback("success", `PDF 已导出：${result.filePath}`);
+    } catch (error) {
+      pushFeedback("error", error.message || "PDF 导出失败");
+    } finally {
+      setActionBusy("");
+    }
+  };
+
+  const handleShareGenerated = async () => {
+    if (!generated?.questions?.length) return;
+    setActionBusy("share");
+    try {
+      await copyText(buildPaperShareText(getGeneratedPaperPayload()));
+      pushFeedback("success", "分享文案已复制，可直接发送。");
+    } catch (error) {
+      pushFeedback("error", error.message || "复制分享文案失败");
+    } finally {
+      setActionBusy("");
     }
   };
 
@@ -424,13 +460,17 @@ export default function AIGenerate({ onStartExam }) {
                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{generated.title}</div>
                   <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>共 {generated.count} 道题目 · {generated.time}</div>
                 </div>
-                <button onClick={handleSave} style={{ 
-                  background: "var(--surface)", color: "var(--accent)", border: "1px solid var(--accent)", 
-                  fontSize: 11, fontWeight: 500, padding: "4px 12px", borderRadius: 4, cursor: "pointer",
-                  transition: "all 0.2s"
-                }} onMouseOver={e => { e.target.style.background = "var(--accent)"; e.target.style.color = "#fff"; }} onMouseOut={e => { e.target.style.background = "var(--surface)"; e.target.style.color = "var(--accent)"; }}>
-                  保存并导入题库
-                </button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button onClick={handleSave} disabled={!!actionBusy} style={{ background: "var(--surface)", color: "var(--accent)", border: "1px solid var(--accent)", fontSize: 11, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer", transition: "all 0.2s" }}>
+                    {actionBusy === "save" ? "保存中..." : "保存并入库"}
+                  </button>
+                  <button onClick={handleExportGeneratedPdf} disabled={!!actionBusy} style={{ background: "var(--surface)", color: "var(--text)", border: "1px solid var(--line)", fontSize: 11, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer" }}>
+                    {actionBusy === "pdf" ? "导出中..." : "导出 PDF"}
+                  </button>
+                  <button onClick={handleShareGenerated} disabled={!!actionBusy} style={{ background: "rgba(109,94,251,0.08)", color: "var(--accent)", border: "1px solid rgba(109,94,251,0.16)", fontSize: 11, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer" }}>
+                    {actionBusy === "share" ? "复制中..." : "复制分享"}
+                  </button>
+                </div>
               </div>
               
               <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 4 }}>

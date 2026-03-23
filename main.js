@@ -1,6 +1,7 @@
 const { app, BrowserWindow, nativeTheme, ipcMain } = require("electron");
 const path = require("path");
 const database = require("./src/main/database.js");
+const paperExport = require("./src/main/paperExport.js");
 
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -187,6 +188,10 @@ ipcMain.handle("db:exportAllData", () => {
 
 ipcMain.handle("db:clearAllData", () => {
   return database.clearAllData();
+});
+
+ipcMain.handle("paper:exportPdf", async (event, payload) => {
+  return paperExport.exportPaperPdf(BrowserWindow.fromWebContents(event.sender), payload || {});
 });
 
 // AI 相关 IPC 处理器

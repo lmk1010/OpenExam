@@ -1,6 +1,6 @@
 {
   "name": "openexam",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -17,6 +17,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.72.1",
     "better-sqlite3": "^12.6.2",
+    "electron-updater": "^6.8.3",
     "openai": "^6.17.0",
     "pdfjs-dist": "^5.5.207",
     "react": "^18.3.1",
@@ -71,7 +72,16 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": "always"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "lmk1010",
+        "repo": "OpenExam",
+        "releaseType": "release"
+      }
+    ],
+    "electronUpdaterCompatibility": ">=2.16"
   },
   "description": "OpenExam desktop AI learning platform",
   "author": "lmk1010"

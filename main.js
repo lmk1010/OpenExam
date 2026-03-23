@@ -2,6 +2,7 @@ const { app, BrowserWindow, nativeTheme, ipcMain, nativeImage } = require("elect
 const path = require("path");
 const database = require("./src/main/database.js");
 const paperExport = require("./src/main/paperExport.js");
+const updater = require("./src/main/updater.js");
 
 const APP_ICON_PATH = path.join(__dirname, "src", "renderer", "assets", "openexam-app-icon.png");
 const APP_ICON = nativeImage.createFromPath(APP_ICON_PATH);
@@ -70,6 +71,7 @@ app.whenReady().then(() => {
   database.initDatabase();
 
   createWindow();
+  updater.initUpdater();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -213,8 +215,44 @@ ipcMain.handle("db:exportAllData", () => {
   return database.exportAllData();
 });
 
+ipcMain.handle("db:resetUserData", () => {
+  return database.resetUserData();
+});
+
 ipcMain.handle("db:clearAllData", () => {
   return database.clearAllData();
+});
+
+ipcMain.handle("app:getInfo", () => {
+  return updater.getAppInfo();
+});
+
+ipcMain.handle("app:getUpdateState", () => {
+  return updater.getUpdateState();
+});
+
+ipcMain.handle("app:checkForUpdates", async () => {
+  return updater.checkForUpdates();
+});
+
+ipcMain.handle("app:quitAndInstallUpdate", () => {
+  return updater.quitAndInstallUpdate();
+});
+
+ipcMain.handle("app:openReleasePage", async () => {
+  return updater.openReleasePage();
+});
+
+ipcMain.handle("app:openExternal", async (event, targetUrl) => {
+  return updater.openExternal(targetUrl);
+});
+
+ipcMain.handle("app:getProfile", () => {
+  return database.getUserProfile();
+});
+
+ipcMain.handle("app:saveProfile", (event, input) => {
+  return database.saveUserProfile(input || {});
 });
 
 ipcMain.handle("paper:exportPdf", async (event, payload) => {

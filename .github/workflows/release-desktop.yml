@@ -24,6 +24,8 @@ jobs:
             artifact_paths: |
               release/*.dmg
               release/*.zip
+              release/*.blockmap
+              release/latest-mac*.yml
           - name: Windows
             os: windows-latest
             command: dist:win

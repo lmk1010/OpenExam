@@ -170,7 +170,10 @@ export default function App() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [profile, setProfile] = useState({ name: "考生用户" });
   const userMenuRef = useRef(null);
+  const displayName = String(profile?.name || "考生用户").trim() || "考生用户";
+  const avatarLetter = Array.from(displayName)[0] || "考";
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -195,12 +198,32 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+
+    const loadProfile = async () => {
+      try {
+        if (!window.openexam?.app?.getProfile) return;
+        const result = await window.openexam.app.getProfile();
+        if (mounted && result && typeof result === "object") {
+          setProfile({ name: String(result.name || "考生用户") || "考生用户" });
+        }
+      } catch (error) {
+        console.error("读取用户信息失败:", error);
+      }
+    };
+
+    loadProfile();
+
     try {
       const done = localStorage.getItem(ONBOARDING_STORAGE_KEY) === "1";
       if (!done) setShowOnboarding(true);
     } catch (error) {
       setShowOnboarding(true);
     }
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -224,7 +247,25 @@ export default function App() {
     setUserMenuOpen(false);
   }, [page]);
 
-  const finishOnboarding = () => {
+  const finishOnboarding = async (payload = {}) => {
+    const nextName = String(payload?.name || displayName).trim() || "考生用户";
+
+    try {
+      if (window.openexam?.app?.saveProfile) {
+        const result = await window.openexam.app.saveProfile({ name: nextName });
+        if (result?.profile) {
+          setProfile(result.profile);
+        } else {
+          setProfile({ name: nextName });
+        }
+      } else {
+        setProfile({ name: nextName });
+      }
+    } catch (error) {
+      console.error("保存用户信息失败:", error);
+      setProfile({ name: nextName });
+    }
+
     try {
       localStorage.setItem(ONBOARDING_STORAGE_KEY, "1");
     } catch (error) {
@@ -241,8 +282,9 @@ export default function App() {
   const onboarding = (
     <OnboardingTour
       open={showOnboarding}
+      defaultName={displayName}
       onFinish={finishOnboarding}
-      onSkip={finishOnboarding}
+      onSkip={() => finishOnboarding({ name: displayName })}
       onNavigate={handleOnboardingNavigate}
     />
   );
@@ -494,14 +536,9 @@ export default function App() {
                     onClick={() => setUserMenuOpen((open) => !open)}
                     aria-expanded={userMenuOpen}
                   >
-                    <span className="user-name">考生用户</span>
+                    <span className="user-name">{displayName}</span>
                     <div className="avatar-wrap">
-                      <div className="avatar">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="avatar-icon">
-                          <path d="M20 21a8 8 0 0 0-16 0"/>
-                          <circle cx="12" cy="8" r="4"/>
-                        </svg>
-                      </div>
+                      <div className="avatar">{avatarLetter}</div>
                       <svg className="avatar-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M7 10l5 5 5-5z"/>
                       </svg>
@@ -511,9 +548,9 @@ export default function App() {
                   {userMenuOpen && (
                     <div className="user-menu">
                       <div className="user-menu-head">
-                        <div className="user-menu-avatar">考</div>
+                        <div className="user-menu-avatar">{avatarLetter}</div>
                         <div>
-                          <div className="user-menu-title">考生用户</div>
+                          <div className="user-menu-title">{displayName}</div>
                           <div className="user-menu-subtitle">本地学习账户</div>
                         </div>
                       </div>

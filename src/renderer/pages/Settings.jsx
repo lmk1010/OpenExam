@@ -3,6 +3,8 @@ import { AI_PROVIDERS, DEFAULT_AI_SETTINGS, getAIProvider, normalizeAISettings }
 import CustomSelect from '../components/CustomSelect.jsx';
 import appLogo from '../assets/openexam-logo.png';
 
+const RESETTABLE_LOCAL_KEYS = ['openexam_settings', 'openexam_onboarding_done_v1', 'openexam_ai_active_session', 'openexam_question_context'];
+
 const ProviderIcon = ({ type }) => {
   const icons = {
     openai: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22.28 9.37a5.5 5.5 0 0 0-.47-4.5 5.56 5.56 0 0 0-6-2.57 5.5 5.5 0 0 0-4.14-1.86 5.56 5.56 0 0 0-5.3 3.85 5.5 5.5 0 0 0-3.68 2.67 5.56 5.56 0 0 0 .68 6.52 5.5 5.5 0 0 0 .47 4.5 5.56 5.56 0 0 0 6 2.57 5.5 5.5 0 0 0 4.14 1.86 5.56 5.56 0 0 0 5.3-3.85 5.5 5.5 0 0 0 3.68-2.67 5.56 5.56 0 0 0-.68-6.52z"/></svg>,
@@ -26,6 +28,42 @@ export default function Settings({ onBack }) {
   const [persistStatus, setPersistStatus] = useState('loading');
   const [lastSavedAt, setLastSavedAt] = useState('');
   const [connectionState, setConnectionState] = useState(null);
+  const [appInfo, setAppInfo] = useState(null);
+  const [updateState, setUpdateState] = useState(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    let dispose = () => {};
+
+    const loadAppState = async () => {
+      try {
+        if (window.openexam?.app?.getInfo) {
+          const info = await window.openexam.app.getInfo();
+          if (mounted) setAppInfo(info || null);
+        }
+
+        if (window.openexam?.app?.getUpdateState) {
+          const state = await window.openexam.app.getUpdateState();
+          if (mounted) setUpdateState(state || null);
+        }
+
+        if (window.openexam?.app?.onUpdateState) {
+          dispose = window.openexam.app.onUpdateState((payload) => {
+            if (mounted) setUpdateState(payload || null);
+          });
+        }
+      } catch (error) {
+        console.error('读取应用状态失败:', error);
+      }
+    };
+
+    loadAppState();
+    return () => {
+      mounted = false;
+      dispose();
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -128,6 +166,81 @@ export default function Settings({ onBack }) {
     }
   };
 
+  const getUpdateSummary = () => {
+    if (!updateState) return '可在此查看版本与 GitHub Release 更新状态';
+
+    const statusMap = {
+      idle: '已接入自动更新，可随时手动检查',
+      checking: '正在检查 GitHub Release 更新',
+      available: '发现新版本，可前往 Release 页面下载',
+      downloading: '正在后台下载更新包',
+      downloaded: '更新包已下载完成，可重启安装',
+      'up-to-date': '当前已经是最新版本',
+      'manual-update': '发现新版本，当前平台建议手动下载安装',
+      dev: '当前为开发环境，仅展示更新状态',
+      error: updateState.message || '更新检查失败，可稍后重试',
+    };
+
+    return statusMap[updateState.status] || updateState.message || '更新状态未知';
+  };
+
+  const handleCheckUpdates = async () => {
+    if (!window.openexam?.app?.checkForUpdates || checkingUpdate) return;
+    setCheckingUpdate(true);
+    try {
+      const result = await window.openexam.app.checkForUpdates();
+      setUpdateState(result || null);
+    } catch (error) {
+      alert(`检查更新失败：${error.message || '未知错误'}`);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  const handleOpenLink = async (targetUrl) => {
+    if (!targetUrl) return;
+    try {
+      if (window.openexam?.app?.openExternal) {
+        await window.openexam.app.openExternal(targetUrl);
+      } else {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch (error) {
+      console.error('打开链接失败:', error);
+    }
+  };
+
+  const handleUpdatePrimary = async () => {
+    if (!updateState) {
+      await handleCheckUpdates();
+      return;
+    }
+
+    if (updateState.status === 'downloaded' && appInfo?.canAutoInstall && window.openexam?.app?.quitAndInstallUpdate) {
+      await window.openexam.app.quitAndInstallUpdate();
+      return;
+    }
+
+    if ([ 'available', 'manual-update', 'error' ].includes(updateState.status) || (!appInfo?.canAutoInstall && updateState.latestVersion && updateState.latestVersion !== appInfo?.version)) {
+      const target = updateState.releaseUrl || appInfo?.releaseUrl || 'https://github.com/lmk1010/OpenExam/releases';
+      if (window.openexam?.app?.openReleasePage) {
+        await window.openexam.app.openReleasePage();
+      } else {
+        await handleOpenLink(target);
+      }
+      return;
+    }
+
+    await handleCheckUpdates();
+  };
+
+  const updatePrimaryLabel = (() => {
+    if (checkingUpdate || updateState?.status === 'checking') return '检查中...';
+    if (updateState?.status === 'downloaded' && appInfo?.canAutoInstall) return '重启安装';
+    if ([ 'available', 'manual-update', 'error' ].includes(updateState?.status) || (!appInfo?.canAutoInstall && updateState?.latestVersion && updateState.latestVersion !== appInfo?.version)) return '前往 Release';
+    return '检查更新';
+  })();
+
   const handleProviderChange = (providerId) => {
     const provider = getAIProvider(providerId);
     setSettings(prev => {
@@ -173,21 +286,22 @@ export default function Settings({ onBack }) {
     }
   };
 
-  const handleClearAllData = async () => {
-    if (!window.openexam?.db?.clearAllData) {
-      alert('当前环境不支持清空数据');
+  const handleResetUserData = async () => {
+    if (!window.openexam?.db?.resetUserData) {
+      alert('当前环境不支持重置用户数据');
       return;
     }
 
-    const confirmed = window.confirm('该操作将删除所有题库、练习记录和错题数据，且不可恢复。是否继续？');
+    const confirmed = window.confirm('该操作会保留题库，但会清空练习进度、错题、本地 AI 会话、设置和自定义内容，恢复到首次打开状态。是否继续？');
     if (!confirmed) return;
 
     try {
-      await window.openexam.db.clearAllData();
-      alert('数据已清空');
+      const result = await window.openexam.db.resetUserData();
+      RESETTABLE_LOCAL_KEYS.forEach((key) => localStorage.removeItem(key));
+      alert(`已重置为新用户状态，题库保留 ${result?.preserved?.papers || 0} 套 / ${result?.preserved?.questions || 0} 题`);
       window.location.reload();
     } catch (error) {
-      alert(`清空失败：${error.message || '未知错误'}`);
+      alert(`重置失败：${error.message || '未知错误'}`);
     }
   };
 
@@ -461,7 +575,7 @@ export default function Settings({ onBack }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div>
                 <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>数据管理</h3>
-                <p style={{ fontSize: 12, color: "var(--muted)" }}>导出或清理本地数据</p>
+                <p style={{ fontSize: 12, color: "var(--muted)" }}>导出备份，或将当前账号恢复到首次打开状态</p>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -481,28 +595,78 @@ export default function Settings({ onBack }) {
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                   </div>
                   <div>
-                    <h4 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px 0", color: "var(--danger)" }}>清空数据</h4>
-                    <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>删除所有本地试题库、进度和记录。此操作不可恢复</p>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px 0", color: "var(--danger)" }}>重置用户数据</h4>
+                    <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>保留内置题库，清空练习进度、错题、AI 会话、设置与自定义内容</p>
                   </div>
-                  <button onClick={handleClearAllData} style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "none", background: "var(--danger)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>彻底清空数据</button>
+                  <button onClick={handleResetUserData} style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "none", background: "var(--danger)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>恢复新用户状态</button>
                 </div>
               </div>
             </div>
           )}
 
           {activeSection === 'about' && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, minHeight: 300 }}>
-              <div className="app-logo app-logo--about">
-                <img src={appLogo} alt="OpenExam" className="app-logo-image" />
+            <div style={{ display: "flex", flexDirection: "column", gap: 20, flex: 1, minHeight: 300, justifyContent: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "22px 24px", borderRadius: 20, background: "linear-gradient(180deg, var(--surface-elevated), var(--surface))", border: "1px solid var(--line)", boxShadow: "var(--elevated-shadow)" }}>
+                <div className="app-logo app-logo--about">
+                  <img src={appLogo} alt="OpenExam" className="app-logo-image" />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <h3 style={{ fontSize: 24, fontWeight: 700, margin: 0, color: "var(--text)", letterSpacing: "-0.5px" }}>OpenExam</h3>
+                    <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 700, background: "var(--accent-soft-bg)", padding: "4px 10px", borderRadius: 999 }}>v{appInfo?.version || '0.2.0'}</span>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>开源公考刷题应用 · 本地优先 · AI 助学</p>
+                  <div style={{ display: "flex", gap: 10, marginTop: 6, flexWrap: "wrap" }}>
+                    <button type="button" onClick={() => handleOpenLink('https://github.com/lmk1010/OpenExam')} style={{ fontSize: 13, color: "var(--text)", fontWeight: 600, padding: "8px 14px", borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface)", cursor: "pointer" }}>GitHub 仓库</button>
+                    <button type="button" onClick={() => handleOpenLink('https://github.com/lmk1010/OpenExam/issues')} style={{ fontSize: 13, color: "var(--text)", fontWeight: 600, padding: "8px 14px", borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface)", cursor: "pointer" }}>反馈问题</button>
+                    <button type="button" onClick={() => handleOpenLink(appInfo?.releaseUrl || 'https://github.com/lmk1010/OpenExam/releases')} style={{ fontSize: 13, color: "var(--text)", fontWeight: 600, padding: "8px 14px", borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface)", cursor: "pointer" }}>Release 页面</button>
+                  </div>
+                </div>
               </div>
-              <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 4, marginTop: 16 }}>
-                <h3 style={{ fontSize: 24, fontWeight: 700, margin: 0, color: "var(--text)", letterSpacing: "-0.5px" }}>OpenExam</h3>
-                <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600, background: "var(--accent-soft-bg)", padding: "4px 10px", borderRadius: 12, display: "inline-block", margin: "4px auto" }}>版本 0.1.0</span>
-                <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>开源公考刷题应用</p>
-              </div>
-              <div style={{ display: "flex", gap: 16, marginTop: 24 }}>
-                <a href="#" style={{ fontSize: 13, color: "var(--text)", textDecoration: "none", fontWeight: 500, padding: "6px 16px", borderRadius: 20, border: "1px solid var(--line)", transition: "all 0.2s" }} onMouseOver={e => e.target.style.background = "var(--surface-soft)"} onMouseOut={e => e.target.style.background = "transparent"}>GitHub</a>
-                <a href="#" style={{ fontSize: 13, color: "var(--text)", textDecoration: "none", fontWeight: 500, padding: "6px 16px", borderRadius: 20, border: "1px solid var(--line)", transition: "all 0.2s" }} onMouseOver={e => e.target.style.background = "var(--surface-soft)"} onMouseOut={e => e.target.style.background = "transparent"}>反馈问题</a>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 16 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "20px 22px", borderRadius: 18, background: "var(--surface-soft)", border: "1px solid var(--line)" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                    <div>
+                      <h4 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>在线更新</h4>
+                      <p style={{ fontSize: 12, color: "var(--muted)", margin: "6px 0 0 0" }}>{getUpdateSummary()}</p>
+                    </div>
+                    <button type="button" onClick={handleUpdatePrimary} disabled={checkingUpdate || updateState?.status === 'checking'} style={{ minWidth: 108, height: 38, borderRadius: 12, border: "none", background: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: checkingUpdate || updateState?.status === 'checking' ? 0.7 : 1 }}>{updatePrimaryLabel}</button>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                    <div style={{ padding: "12px 14px", borderRadius: 14, background: "var(--surface)", border: "1px solid var(--line)" }}>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>当前版本</div>
+                      <strong style={{ fontSize: 16 }}>{appInfo?.version ? `v${appInfo.version}` : '-'}</strong>
+                    </div>
+                    <div style={{ padding: "12px 14px", borderRadius: 14, background: "var(--surface)", border: "1px solid var(--line)" }}>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>最新版本</div>
+                      <strong style={{ fontSize: 16 }}>{updateState?.latestVersion ? `v${updateState.latestVersion}` : '-'}</strong>
+                    </div>
+                    <div style={{ padding: "12px 14px", borderRadius: 14, background: "var(--surface)", border: "1px solid var(--line)" }}>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>更新方式</div>
+                      <strong style={{ fontSize: 14 }}>{appInfo?.canAutoInstall ? '自动下载 / 安装' : '检测后手动下载'}</strong>
+                    </div>
+                    <div style={{ padding: "12px 14px", borderRadius: 14, background: "var(--surface)", border: "1px solid var(--line)" }}>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>上次检查</div>
+                      <strong style={{ fontSize: 14 }}>{formatTime(updateState?.lastCheckedAt)}</strong>
+                    </div>
+                  </div>
+                  {updateState?.message && (
+                    <div style={{ fontSize: 12, color: updateState?.status === 'error' ? 'var(--danger)' : 'var(--muted)', lineHeight: 1.7 }}>
+                      {updateState.message}
+                      {updateState?.error ? `：${updateState.error}` : ''}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "20px 22px", borderRadius: 18, background: "var(--surface-soft)", border: "1px solid var(--line)" }}>
+                  <h4 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Release 提示</h4>
+                  <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.8 }}>
+                    <div>Windows：可直接通过应用内更新下载安装。</div>
+                    <div>macOS：检测到新版后会打开 GitHub Release 下载。</div>
+                    <div>若 macOS 首次打开被拦截，请按 Release 说明移除隔离属性。</div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

@@ -7,6 +7,8 @@ const achievementCatalog = require('../shared/achievementCatalog.json');
 let db = null;
 
 const REVIEW_INTERVAL_DAYS = [0, 1, 2, 4, 7, 15, 30];
+const USER_GENERATED_PAPER_TYPES = ['imported', 'ai_exam', 'ai_practice'];
+const USER_GENERATED_PAPER_TYPE_SQL = USER_GENERATED_PAPER_TYPES.map((type) => `\'${type}\'`).join(', ');
 
 function toSQLiteDateTime(input = new Date()) {
   const date = input instanceof Date ? input : new Date(input);
@@ -1113,6 +1115,41 @@ function saveAIConnectionState(state) {
   };
 }
 
+const DEFAULT_USER_PROFILE = Object.freeze({
+  name: '考生用户',
+});
+
+function normalizeUserProfile(input) {
+  const name = String(input?.name || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 24);
+
+  return {
+    name: name || DEFAULT_USER_PROFILE.name,
+  };
+}
+
+function getUserProfile() {
+  const row = getAppSetting('user_profile');
+  if (!row?.value) return { ...DEFAULT_USER_PROFILE };
+  try {
+    return normalizeUserProfile(JSON.parse(row.value));
+  } catch (error) {
+    return { ...DEFAULT_USER_PROFILE };
+  }
+}
+
+function saveUserProfile(input) {
+  const profile = normalizeUserProfile(input);
+  const row = setAppSetting('user_profile', JSON.stringify(profile));
+  return {
+    success: true,
+    profile,
+    updatedAt: row?.updated_at || new Date().toISOString(),
+  };
+}
+
 function createAIChatSession(input = {}) {
   const id = String(input.id || `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
   const title = String(input.title || '新会话').trim() || '新会话';
@@ -1248,6 +1285,61 @@ function exportAllData() {
   };
 }
 
+function resetUserData() {
+  const clearedAt = new Date().toISOString();
+  const savedPaperIds = db.prepare(`
+    SELECT id FROM papers
+    WHERE type IN (${USER_GENERATED_PAPER_TYPE_SQL})
+  `).all().map((row) => row.id);
+
+  const deleteSavedQuestions = savedPaperIds.length > 0
+    ? db.prepare(`DELETE FROM questions WHERE paper_id IN (${savedPaperIds.map(() => '?').join(', ')})`)
+    : null;
+  const deleteSavedPapers = savedPaperIds.length > 0
+    ? db.prepare(`DELETE FROM papers WHERE id IN (${savedPaperIds.map(() => '?').join(', ')})`)
+    : null;
+
+  const cleared = db.transaction(() => {
+    const wrongQuestions = db.prepare('DELETE FROM wrong_questions').run().changes;
+    const practiceRecords = db.prepare('DELETE FROM practice_records').run().changes;
+    const aiChatMessages = db.prepare('DELETE FROM ai_chat_messages').run().changes;
+    const aiChatSessions = db.prepare('DELETE FROM ai_chat_sessions').run().changes;
+    const appSettings = db.prepare('DELETE FROM app_settings').run().changes;
+    const savedQuestions = deleteSavedQuestions ? deleteSavedQuestions.run(...savedPaperIds).changes : 0;
+    const savedPapers = deleteSavedPapers ? deleteSavedPapers.run(...savedPaperIds).changes : 0;
+
+    return {
+      wrongQuestions,
+      practiceRecords,
+      aiChatMessages,
+      aiChatSessions,
+      appSettings,
+      savedQuestions,
+      savedPapers,
+    };
+  })();
+
+  const preserved = {
+    papers: db.prepare(`
+      SELECT COUNT(*) AS c FROM papers
+      WHERE type NOT IN (${USER_GENERATED_PAPER_TYPE_SQL})
+    `).get().c,
+    questions: db.prepare(`
+      SELECT COUNT(*) AS c
+      FROM questions q
+      INNER JOIN papers p ON p.id = q.paper_id
+      WHERE p.type NOT IN (${USER_GENERATED_PAPER_TYPE_SQL})
+    `).get().c,
+  };
+
+  return {
+    success: true,
+    clearedAt,
+    cleared,
+    preserved,
+  };
+}
+
 function clearAllData() {
   db.transaction(() => {
     db.prepare('DELETE FROM wrong_questions').run();
@@ -1304,6 +1396,8 @@ module.exports = {
   saveAISettings,
   getAIConnectionState,
   saveAIConnectionState,
+  getUserProfile,
+  saveUserProfile,
   createAIChatSession,
   getAIChatSessions,
   getAIChatMessages,
@@ -1311,6 +1405,7 @@ module.exports = {
   renameAIChatSession,
   deleteAIChatSession,
   exportAllData,
+  resetUserData,
   clearAllData,
   closeDatabase
 };

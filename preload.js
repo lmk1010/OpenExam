@@ -43,7 +43,25 @@ contextBridge.exposeInMainWorld("openexam", {
     renameAIChatSession: (sessionId, title) => ipcRenderer.invoke("db:renameAIChatSession", sessionId, title),
     deleteAIChatSession: (sessionId) => ipcRenderer.invoke("db:deleteAIChatSession", sessionId),
     exportAllData: () => ipcRenderer.invoke("db:exportAllData"),
+    resetUserData: () => ipcRenderer.invoke("db:resetUserData"),
     clearAllData: () => ipcRenderer.invoke("db:clearAllData"),
+  },
+
+  app: {
+    getInfo: () => ipcRenderer.invoke("app:getInfo"),
+    getUpdateState: () => ipcRenderer.invoke("app:getUpdateState"),
+    checkForUpdates: () => ipcRenderer.invoke("app:checkForUpdates"),
+    quitAndInstallUpdate: () => ipcRenderer.invoke("app:quitAndInstallUpdate"),
+    openReleasePage: () => ipcRenderer.invoke("app:openReleasePage"),
+    openExternal: (targetUrl) => ipcRenderer.invoke("app:openExternal", targetUrl),
+    getProfile: () => ipcRenderer.invoke("app:getProfile"),
+    saveProfile: (input) => ipcRenderer.invoke("app:saveProfile", input),
+    onUpdateState: (handler) => {
+      if (typeof handler !== "function") return () => {};
+      const listener = (_event, payload) => handler(payload);
+      ipcRenderer.on("app:update-state", listener);
+      return () => ipcRenderer.removeListener("app:update-state", listener);
+    },
   },
 
   paper: {

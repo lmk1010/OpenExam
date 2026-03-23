@@ -219,14 +219,25 @@ export default function PaperList({ onOpenPaper }) {
                 {'★'.repeat(paper.difficulty || 3)}{'☆'.repeat(5 - (paper.difficulty || 3))}
               </span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, marginTop: 14 }}>
-              <button className="paper-start-btn" onClick={() => handleStart(paper)} style={{ margin: 0 }}>
-                {getPaperActionLabel(paper)}
-              </button>
-              <button onClick={() => handleExportPaper(paper)} disabled={busyAction === `pdf:${paper.id}`} style={{ padding: '0 12px', borderRadius: 12, border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: busyAction ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
+            <div className="paper-actions">
+              <button
+                className="paper-action-btn paper-action-btn--ghost"
+                onClick={() => handleExportPaper(paper)}
+                disabled={busyAction === `pdf:${paper.id}`}
+              >
                 {busyAction === `pdf:${paper.id}` ? '导出中...' : 'PDF'}
               </button>
-              <button onClick={() => handleSharePaper(paper)} disabled={busyAction === `share:${paper.id}`} style={{ padding: '0 12px', borderRadius: 12, border: '1px solid var(--accent-border-soft)', background: 'var(--accent-soft-bg)', color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: busyAction ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
+              <button
+                className="paper-start-btn paper-action-btn paper-action-btn--primary"
+                onClick={() => handleStart(paper)}
+              >
+                {getPaperActionLabel(paper)}
+              </button>
+              <button
+                className="paper-action-btn paper-action-btn--accent"
+                onClick={() => handleSharePaper(paper)}
+                disabled={busyAction === `share:${paper.id}`}
+              >
                 {busyAction === `share:${paper.id}` ? '复制中...' : '分享'}
               </button>
             </div>

@@ -1,0 +1,75 @@
+<svg width="1280" height="980" viewBox="0 0 1280 980" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="980" rx="36" fill="#F6F8FA"/>
+  <text x="72" y="74" fill="#1F2328" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">OpenExam 界面预览</text>
+  <text x="72" y="108" fill="#656D76" font-family="Arial, Helvetica, sans-serif" font-size="16">学习中心 / 我的成长 / AI 导师 / 深色模式</text>
+
+  <g>
+    <rect x="56" y="144" width="556" height="352" rx="24" fill="#FFFFFF" stroke="#D0D7DE"/>
+    <rect x="80" y="176" width="84" height="288" rx="18" fill="#F6F8FA"/>
+    <rect x="188" y="176" width="392" height="76" rx="18" fill="#FFFFFF" stroke="#D8DEE4"/>
+    <rect x="188" y="272" width="392" height="132" rx="18" fill="#EEF2FF"/>
+    <path d="M216 374C258 374 248 318 292 318C334 318 326 382 374 382C420 382 430 296 476 296C520 296 520 374 552 374" stroke="#6D6AF8" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="476" cy="296" r="5" fill="#6D6AF8"/>
+    <rect x="188" y="424" width="184" height="40" rx="14" fill="#FFFFFF" stroke="#D8DEE4"/>
+    <rect x="396" y="424" width="184" height="40" rx="14" fill="#FFFFFF" stroke="#D8DEE4"/>
+    <text x="188" y="164" fill="#1F2328" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">学习中心</text>
+    <text x="188" y="203" fill="#656D76" font-family="Arial, Helvetica, sans-serif" font-size="13">行测专项 / 刷题统计 / 热门题库</text>
+  </g>
+
+  <g>
+    <rect x="668" y="144" width="556" height="352" rx="24" fill="#FFFFFF" stroke="#D0D7DE"/>
+    <rect x="692" y="176" width="132" height="284" rx="20" fill="#F3F0FF" stroke="#D9D2FF"/>
+    <rect x="850" y="176" width="188" height="284" rx="20" fill="#FFFFFF" stroke="#D8DEE4"/>
+    <rect x="1058" y="176" width="142" height="120" rx="20" fill="#FFFFFF" stroke="#D8DEE4"/>
+    <rect x="1058" y="316" width="142" height="144" rx="20" fill="#FFFFFF" stroke="#D8DEE4"/>
+    <g fill="#EEF2FF" stroke="#D9D2FF">
+      <rect x="874" y="250" width="28" height="28" rx="7"/>
+      <rect x="910" y="250" width="28" height="28" rx="7"/>
+      <rect x="946" y="250" width="28" height="28" rx="7"/>
+      <rect x="982" y="250" width="28" height="28" rx="7"/>
+      <rect x="874" y="286" width="28" height="28" rx="7"/>
+      <rect x="910" y="286" width="28" height="28" rx="7"/>
+      <rect x="946" y="286" width="28" height="28" rx="7"/>
+      <rect x="982" y="286" width="28" height="28" rx="7"/>
+      <rect x="874" y="322" width="28" height="28" rx="7"/>
+      <rect x="910" y="322" width="28" height="28" rx="7"/>
+      <rect x="946" y="322" width="28" height="28" rx="7"/>
+      <rect x="982" y="322" width="28" height="28" rx="7"/>
+    </g>
+    <circle cx="1129" cy="236" r="38" stroke="#2DAA84" stroke-width="6"/>
+    <circle cx="1129" cy="388" r="30" stroke="#6D6AF8" stroke-width="6" stroke-dasharray="110 188" stroke-linecap="round"/>
+    <text x="668" y="164" fill="#1F2328" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">我的成长</text>
+    <text x="668" y="203" fill="#656D76" font-family="Arial, Helvetica, sans-serif" font-size="13">学习日历 / 成就展柜 / 阶段目标</text>
+  </g>
+
+  <g>
+    <rect x="56" y="542" width="556" height="352" rx="24" fill="#FFFFFF" stroke="#D0D7DE"/>
+    <rect x="80" y="574" width="154" height="288" rx="18" fill="#F6F8FA"/>
+    <rect x="256" y="574" width="324" height="224" rx="18" fill="#FFFFFF" stroke="#D8DEE4"/>
+    <rect x="256" y="818" width="324" height="44" rx="16" fill="#F6F8FA" stroke="#D8DEE4"/>
+    <rect x="96" y="614" width="122" height="54" rx="14" fill="#EEF2FF"/>
+    <rect x="96" y="680" width="122" height="44" rx="14" fill="#FFFFFF" stroke="#D8DEE4"/>
+    <rect x="96" y="734" width="122" height="44" rx="14" fill="#FFFFFF" stroke="#D8DEE4"/>
+    <rect x="96" y="788" width="122" height="44" rx="14" fill="#FFFFFF" stroke="#D8DEE4"/>
+    <path d="M292 648H500" stroke="#D8DEE4" stroke-width="4" stroke-linecap="round"/>
+    <path d="M292 686H520" stroke="#6D6AF8" stroke-width="4" stroke-linecap="round"/>
+    <path d="M292 724H496" stroke="#D8DEE4" stroke-width="4" stroke-linecap="round"/>
+    <path d="M292 762H476" stroke="#D8DEE4" stroke-width="4" stroke-linecap="round"/>
+    <text x="56" y="562" fill="#1F2328" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">AI 智能导师</text>
+    <text x="56" y="601" fill="#656D76" font-family="Arial, Helvetica, sans-serif" font-size="13">新建会话 / 快捷追问 / 对话辅导</text>
+  </g>
+
+  <g>
+    <rect x="668" y="542" width="556" height="352" rx="24" fill="#24292F" stroke="#30363D"/>
+    <rect x="692" y="574" width="84" height="288" rx="18" fill="#2D333B"/>
+    <rect x="800" y="574" width="392" height="76" rx="18" fill="#24292F" stroke="#30363D"/>
+    <rect x="800" y="670" width="392" height="132" rx="18" fill="#292D3E"/>
+    <path d="M828 772C870 772 860 716 904 716C946 716 938 780 986 780C1032 780 1042 694 1088 694C1132 694 1132 772 1164 772" stroke="#8B949E" stroke-width="4" stroke-linecap="round"/>
+    <path d="M828 772C860 772 868 706 916 706C964 706 970 768 1024 768C1064 768 1082 660 1128 660C1154 660 1170 704 1184 736" stroke="#8B5CF6" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="1128" cy="660" r="5" fill="#8B5CF6"/>
+    <rect x="800" y="822" width="184" height="40" rx="14" fill="#2D333B" stroke="#30363D"/>
+    <rect x="1008" y="822" width="184" height="40" rx="14" fill="#2D333B" stroke="#30363D"/>
+    <text x="668" y="562" fill="#F0F6FC" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">深色模式</text>
+    <text x="668" y="601" fill="#8B949E" font-family="Arial, Helvetica, sans-serif" font-size="13">护眼配色 / 信息密度优化 / 统一主题</text>
+  </g>
+</svg>

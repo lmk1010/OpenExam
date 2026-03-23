@@ -4,7 +4,7 @@
 const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
-const { app } = require('electron');
+const { normalizeQuestionTaxonomy, isFakeQuestion } = require('../src/shared/questionCategory');
 
 // 数据库路径 - 使用与应用相同的路径
 const userDataPath = process.env.HOME + '/Library/Application Support/openexam';
@@ -42,6 +42,9 @@ const importAll = db.transaction(() => {
   let totalQuestions = 0;
 
   for (const paper of papers) {
+    const validQuestions = Array.isArray(paper.questions) ? paper.questions.filter((question) => !isFakeQuestion(question)) : [];
+    if (!validQuestions.length) continue;
+
     // 插入试卷
     insertPaper.run(
       paper.id,
@@ -50,21 +53,26 @@ const importAll = db.transaction(() => {
       paper.type,
       'xingce',
       paper.province,
-      paper.question_count,
+      validQuestions.length,
       120,
       Math.round(paper.difficulty)
     );
 
     // 插入题目 - 使用 paper_id + order_num 作为唯一ID，避免重复
-    for (const q of paper.questions) {
+    for (const q of validQuestions) {
       const uniqueId = `${paper.id}_q${q.order_num}`;
+      const taxonomy = normalizeQuestionTaxonomy({
+        category: q.category,
+        sub_category: q.sub_category,
+        content: q.content,
+      });
       insertQuestion.run(
         uniqueId,
         paper.id,
         q.order_num,
         q.type,
-        q.category,
-        q.sub_category,
+        taxonomy.category,
+        taxonomy.subCategory,
         q.content,
         JSON.stringify(q.options),
         q.answer,
@@ -75,7 +83,7 @@ const importAll = db.transaction(() => {
       totalQuestions++;
     }
 
-    console.log(`✓ ${paper.title} (${paper.questions.length}题)`);
+    console.log(`✓ ${paper.title} (${validQuestions.length}题)`);
   }
 
   return totalQuestions;

@@ -1,40 +1,8 @@
 import React, { useState, useEffect } from "react";
-
-// ─── Icon helper ──────────────────────────────────────────────────────────────
-const Ico = ({ d, size = 14, col = "currentColor", sw = 1.8 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-    stroke={col} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
-    {d}
-  </svg>
-);
-
-const ICONS = {
-  trophy:  <><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></>,
-  streak:  <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></>,
-  check:   <><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>,
-  clock:   <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
-  target:  <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>,
-  star:    <><path d="M12 2l3 6 6 3-6 3-3 6-3-6-6-3 6-3z"/></>,
-  book:    <><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></>,
-  chart:   <><path d="M18 20V10M12 20V4M6 20v-6"/></>,
-  growth:  <><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></>,
-  correct: <><polyline points="20 6 9 17 4 12"/></>,
-  wrong:   <><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6m0-6l6 6"/></>,
-  days:    <><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
-  ai:      <><path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1V5.73A2 2 0 0112 2z"/></>,
-  first:   <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>,
-  speed:   <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
-  hundred: <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></>,
-};
-
-const ACH_ICONS = {
-  first:   ICONS.first,
-  hundred: ICONS.hundred,
-  streak7: ICONS.streak,
-  perfect: ICONS.check,
-  speed:   ICONS.speed,
-  master:  ICONS.trophy,
-};
+import { ICONS, Ico, getAchievementTierStyle } from "../components/AchievementVisuals.jsx";
+import AchievementTile, { AchievementRing } from "../components/AchievementTile.jsx";
+import AchievementDialog from "../components/AchievementDialog.jsx";
+import { normalizeAchievements } from "../utils/achievementUtils.js";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 const SectionHead = ({ icon, title, color = "var(--accent)", right }) => (
@@ -58,11 +26,51 @@ const heatBg = lvl => [
   "var(--accent)",
 ][lvl] || "rgba(109,94,251,0.05)";
 
+const formatHeatmapDate = (value) => {
+  if (!value) return "最近 90 天";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+};
+
+const getHeatmapSummary = (cell) => {
+  if (!cell?.date) {
+    return {
+      label: "最近 90 天",
+      detail: "悬浮到方块上查看每天的学习情况",
+      badge: "暂无数据",
+      badgeColor: "var(--muted)",
+      badgeBg: "rgba(0,0,0,0.05)",
+    };
+  }
+
+  if (cell.count > 0) {
+    return {
+      label: formatHeatmapDate(cell.date),
+      detail: `当天完成 ${cell.count} 题 · ${cell.sessions || 0} 次练习`,
+      badge: "已学习",
+      badgeColor: "#00b894",
+      badgeBg: "rgba(0,184,148,0.1)",
+    };
+  }
+
+  return {
+    label: formatHeatmapDate(cell.date),
+    detail: "当天暂无练习记录",
+    badge: "未学习",
+    badgeColor: "var(--muted)",
+    badgeBg: "rgba(0,0,0,0.05)",
+  };
+};
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
-export default function GrowthCenter() {
-  const [data, setData]       = useState(null);
+export default function GrowthCenter({ onOpenAchievements }) {
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [dailyGoal]           = useState(50);
+  const [dailyGoal] = useState(50);
+  const [hoveredHeatmapCell, setHoveredHeatmapCell] = useState(null);
+  const [selectedAchievementId, setSelectedAchievementId] = useState(null);
+  const [detailAchievementId, setDetailAchievementId] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -85,19 +93,32 @@ export default function GrowthCenter() {
   );
 
   const d = data || { streak: 0, today: { total: 0, correct: 0, duration: 0 }, heatmap: [], achievements: [], practiceStats: { accuracy: 0, totalDone: 0, correctCount: 0, wrongCount: 0 }, totalMinutes: 0, level: 1, exp: 0, maxExp: 100, levelTitle: "新手学员" };
+  const achievements = normalizeAchievements(d.achievements, d);
 
   const todayPct    = dailyGoal > 0 ? Math.min(100, Math.round((d.today.total / dailyGoal) * 100)) : 0;
-  const unlockedCnt = d.achievements.filter(a => a.unlocked).length;
+  const unlockedCnt = achievements.filter(a => a.unlocked).length;
   const studyDays   = d.heatmap.filter(h => h.count > 0).length;
   const expPct      = d.maxExp > 0 ? Math.round((d.exp / d.maxExp) * 100) : 0;
   const todayAccuracy = d.today.total > 0 ? Math.round((d.today.correct / d.today.total) * 100) : null;
 
   const overallGoals = [
-    { label: "入门 · 50题",   target: 50,  current: d.practiceStats.totalDone },
-    { label: "进阶 · 200题",  target: 200, current: d.practiceStats.totalDone },
-    { label: "熟练 · 500题",  target: 500, current: d.practiceStats.totalDone },
-    { label: "专家 · 1000题", target: 1000,current: d.practiceStats.totalDone },
+    { label: "入门 · 50题", target: 50, current: d.practiceStats.totalDone },
+    { label: "进阶 · 200题", target: 200, current: d.practiceStats.totalDone },
+    { label: "熟练 · 500题", target: 500, current: d.practiceStats.totalDone },
+    { label: "专家 · 1000题", target: 1000, current: d.practiceStats.totalDone },
   ];
+
+  const fallbackHeatmapCell = d.heatmap[d.heatmap.length - 1] || { date: "", count: 0, sessions: 0, level: 0 };
+  const activeHeatmapCell = hoveredHeatmapCell?.date ? hoveredHeatmapCell : fallbackHeatmapCell;
+  const heatmapSummary = getHeatmapSummary(activeHeatmapCell);
+  const achievementPreviewCount = 6;
+  const visibleAchievements = achievements.slice(0, achievementPreviewCount);
+  const remainingAchievements = Math.max(0, achievements.length - achievementPreviewCount);
+  const selectedAchievement = achievements.find(a => a.id === selectedAchievementId)
+    || achievements.find(a => a.unlocked)
+    || achievements[0]
+    || null;
+  const detailAchievement = achievements.find(a => a.id === detailAchievementId) || null;
 
   return (
     <section className="main-panel" style={{ padding: 0, display: "flex", flexDirection: "column", overflow: "hidden", height: "100%", boxSizing: "border-box" }}>
@@ -242,20 +263,79 @@ export default function GrowthCenter() {
               <div>
                 <SectionHead icon={ICONS.days} title="学习日历" color="#1e78ff"
                   right={<span style={{ fontSize: 10, color: "var(--muted)" }}>近 90 天</span>} />
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(13, 1fr)", gap: 3 }}>
-                    {(d.heatmap.length > 0 ? d.heatmap.slice(0, 91) : Array(91).fill({ date: "", count: 0, level: 0 })).map((cell, idx) => (
-                      <div key={idx} title={cell.date ? `${cell.date}: ${cell.count} 题` : ""}
-                        style={{ aspectRatio: "1", borderRadius: 3, background: heatBg(cell.level), cursor: cell.count > 0 ? "pointer" : "default", transition: "transform 0.1s" }}
-                        onMouseEnter={e => { if (cell.count > 0) e.currentTarget.style.transform = "scale(1.2)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.transform = ""; }}
-                      />
-                    ))}
+                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid var(--line)",
+                    background: "linear-gradient(180deg, rgba(109,94,251,0.05) 0%, rgba(109,94,251,0.02) 100%)",
+                  }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>{heatmapSummary.label}</div>
+                      <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 3 }}>{heatmapSummary.detail}</div>
+                    </div>
+                    <span style={{
+                      flexShrink: 0,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color: heatmapSummary.badgeColor,
+                      background: heatmapSummary.badgeBg,
+                      borderRadius: 999,
+                      padding: "4px 9px",
+                    }}>{heatmapSummary.badge}</span>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--muted)", marginTop: 8, justifyContent: "flex-end" }}>
-                    <span>少</span>
-                    {[0,1,2,3,4].map(l => <div key={l} style={{ width: 8, height: 8, borderRadius: 2, background: heatBg(l) }} />)}
-                    <span>多</span>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(13, minmax(0, 1fr))", gap: 4 }}>
+                    {(d.heatmap.length > 0 ? d.heatmap.slice(0, 91) : Array.from({ length: 91 }, () => ({ date: "", count: 0, sessions: 0, level: 0 }))).map((cell, idx) => {
+                      const isActive = !!cell.date && activeHeatmapCell?.date === cell.date;
+                      return (
+                        <div
+                          key={idx}
+                          title={cell.date ? `${cell.date} · ${cell.count}题 · ${cell.sessions || 0}次练习` : ""}
+                          style={{
+                            aspectRatio: "1",
+                            borderRadius: 4,
+                            background: heatBg(cell.level),
+                            cursor: "pointer",
+                            border: isActive ? "1px solid rgba(109,94,251,0.55)" : "1px solid rgba(109,94,251,0.08)",
+                            boxShadow: isActive ? "0 8px 16px rgba(109,94,251,0.16)" : "none",
+                            transform: isActive ? "translateY(-1px)" : "none",
+                            transition: "all 0.16s ease",
+                            position: "relative",
+                            overflow: "hidden",
+                          }}
+                          onMouseEnter={() => setHoveredHeatmapCell(cell)}
+                          onMouseLeave={() => setHoveredHeatmapCell(null)}
+                        >
+                          {cell.count > 0 && (
+                            <span style={{
+                              position: "absolute",
+                              right: 2,
+                              bottom: 2,
+                              width: 4,
+                              height: 4,
+                              borderRadius: "50%",
+                              background: "rgba(255,255,255,0.92)",
+                            }} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "var(--muted)" }}>
+                      <span>少</span>
+                      {[0, 1, 2, 3, 4].map(level => (
+                        <div key={level} style={{ width: 8, height: 8, borderRadius: 2, background: heatBg(level) }} />
+                      ))}
+                      <span>多</span>
+                    </div>
+                    <span style={{ fontSize: 10, color: "var(--muted)" }}>悬浮查看当天题量与练习次数</span>
                   </div>
                 </div>
               </div>
@@ -288,40 +368,90 @@ export default function GrowthCenter() {
             {/* col 2 — achievements */}
             <div>
               <SectionHead icon={ICONS.trophy} title="成就展柜" color="#f39c12"
-                right={<span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 600 }}>{unlockedCnt}/{d.achievements.length} 已解锁</span>} />
-              <div style={{ display: "flex", flexDirection: "column", gap: 0, marginTop: 8 }}>
-                {d.achievements.map((ach, i, arr) => (
-                  <div key={ach.id} style={{
-                    display: "flex", gap: 10, alignItems: "center",
-                    padding: "10px 0",
-                    borderBottom: i < arr.length - 1 ? "1px solid var(--line)" : "none",
-                    opacity: ach.unlocked ? 1 : 0.38,
-                    transition: "opacity 0.3s",
-                  }}>
-                    <div style={{
-                      width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-                      background: ach.unlocked ? "rgba(109,94,251,0.1)" : "var(--surface-soft)",
-                      color: ach.unlocked ? "var(--accent)" : "var(--muted)",
-                      display: "grid", placeItems: "center",
-                      boxShadow: ach.unlocked ? "0 2px 8px rgba(109,94,251,0.12)" : "none",
+                right={<span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 600 }}>{unlockedCnt}/{achievements.length} 已解锁</span>} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+                {selectedAchievement && (
+                  <button
+                    type="button"
+                    onClick={() => setDetailAchievementId(selectedAchievement.id)}
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "center",
+                      padding: "10px 0 12px",
+                      borderBottom: "1px solid rgba(148,163,184,0.14)",
+                      width: "100%",
+                      background: "transparent",
+                      borderTop: "none",
+                      borderLeft: "none",
+                      borderRight: "none",
+                      textAlign: "left",
+                      cursor: "pointer",
                     }}>
-                      <Ico d={ACH_ICONS[ach.id] || ICONS.first} size={15} col={ach.unlocked ? "var(--accent)" : "var(--muted)"} sw={1.8} />
-                    </div>
+                    <AchievementRing achievement={selectedAchievement} size={64} compact />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                        <span style={{ fontSize: 12, fontWeight: 500 }}>{ach.name}</span>
-                        {ach.unlocked && (
-                          <span style={{ fontSize: 9, color: "#00b894", background: "rgba(0,184,148,0.1)", padding: "1px 5px", borderRadius: 3, fontWeight: 600, flexShrink: 0 }}>已解锁</span>
-                        )}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: "var(--text)" }}>{selectedAchievement.name}</span>
+                        <span style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          color: selectedAchievement.unlocked ? "#00b894" : "var(--muted)",
+                          background: selectedAchievement.unlocked ? "rgba(0,184,148,0.08)" : "rgba(148,163,184,0.10)",
+                          borderRadius: 999,
+                          padding: "2px 6px",
+                        }}>{selectedAchievement.unlocked ? "已解锁" : "待解锁"}</span>
+                        {selectedAchievement.tier && (() => {
+                          const tierStyle = getAchievementTierStyle(selectedAchievement.tier);
+                          return (
+                            <span style={{ fontSize: 9, color: tierStyle.color, background: tierStyle.bg, border: `1px solid ${tierStyle.border}`, borderRadius: 999, padding: "2px 6px", fontWeight: 700 }}>{tierStyle.label}</span>
+                          );
+                        })()}
                       </div>
-                      <div style={{ fontSize: 10, color: "var(--muted)", lineHeight: 1.5 }}>{ach.desc}</div>
+                      <div style={{ fontSize: 10, color: "var(--muted)", lineHeight: 1.55, marginTop: 4 }}>{selectedAchievement.desc}</div>
+                      <div style={{ fontSize: 10, color: selectedAchievement.unlocked ? "#00b894" : "var(--accent)", marginTop: 5, fontWeight: 700 }}>{selectedAchievement.progressText}</div>
                     </div>
-                  </div>
-                ))}
-                {d.achievements.length === 0 && (
-                  <div style={{ padding: "30px 0", textAlign: "center", color: "var(--muted)", fontSize: 11, opacity: 0.5 }}>
-                    完成练习后成就将自动解锁
-                  </div>
+                  </button>
+                )}
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+                  {visibleAchievements.map((ach) => {
+                    const isSelected = selectedAchievement?.id === ach.id;
+                    return (
+                      <AchievementTile
+                        key={ach.id}
+                        achievement={ach}
+                        compact
+                        selected={isSelected}
+                        showDetail={false}
+                        onClick={() => { setSelectedAchievementId(ach.id); setDetailAchievementId(ach.id); }}
+                      />
+                    );
+                  })}
+
+                  {achievements.length === 0 && (
+                    <div style={{ gridColumn: "1 / -1", padding: "30px 0", textAlign: "center", color: "var(--muted)", fontSize: 11, opacity: 0.5 }}>
+                      完成练习后成就将自动解锁
+                    </div>
+                  )}
+                </div>
+
+                {remainingAchievements > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenAchievements?.()}
+                    style={{
+                      height: 36,
+                      borderRadius: 10,
+                      border: "1px solid rgba(109,94,251,0.16)",
+                      background: "rgba(109,94,251,0.05)",
+                      color: "var(--accent)",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    查看全部成就 · 还有 {remainingAchievements} 项
+                  </button>
                 )}
               </div>
             </div>
@@ -330,6 +460,7 @@ export default function GrowthCenter() {
         </div>
       </div>
 
+      <AchievementDialog achievement={detailAchievement} onClose={() => setDetailAchievementId(null)} />
       <style dangerouslySetInnerHTML={{ __html: `@keyframes spin { to { transform: rotate(360deg); } }` }} />
     </section>
   );

@@ -14,7 +14,7 @@ const defaultSubCategories = {
   yanyu: ['xuanci', 'yueduan', 'yuju', 'wenzhang'],
   shuliang: ['jisuan', 'tuili'],
   panduan: ['tuxing', 'dingyi', 'leibi', 'luoji'],
-  ziliao: ['wenzi', 'biaoge', 'tubiao', 'zonghe'],
+  ziliao: ['wenzi', 'biaoge', 'tubiao', 'zonghe', 'zengzhang'],
   changshi: ['zhengzhi', 'jingji', 'falv', 'keji', 'renwen', 'dili'],
 };
 

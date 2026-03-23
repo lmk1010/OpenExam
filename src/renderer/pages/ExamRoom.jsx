@@ -63,7 +63,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
   useEffect(() => {
     if (propQuestions?.length > 0) {
       setQuestions(propQuestions);
-      setPaper({ title: `${CAT_NAMES[config?.category] || '专项'}练习`, type: 'practice' });
+      setPaper({ title: config?.title || `${CAT_NAMES[config?.category] || '专项'}练习`, type: 'practice' });
     } else if (paperId) {
       const state = getState();
       setQuestions(state.currentQuestions || []);
@@ -134,7 +134,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
       }
       try {
         const recordId = `record_${Date.now()}`;
-        await window.openexam.db.savePracticeRecord({ id: recordId, paperId: paperId || null, category: config?.category || null, subCategory: config?.subCategory || null, startTime: new Date(Date.now() - timeElapsed * 1000).toISOString(), endTime: new Date().toISOString(), duration: timeElapsed, status: 'completed', answers, correctCount, totalCount: questions.length, accuracy: result.accuracy, score: Math.round((correctCount / questions.length) * 100) });
+        await window.openexam.db.savePracticeRecord({ id: recordId, paperId: config?.sourcePaperId || paperId || null, category: config?.category || null, subCategory: config?.subCategory || null, startTime: new Date(Date.now() - timeElapsed * 1000).toISOString(), endTime: new Date().toISOString(), duration: timeElapsed, status: 'completed', answers, correctCount, totalCount: questions.length, accuracy: result.accuracy, score: Math.round((correctCount / questions.length) * 100) });
         for (const wq of wrongQuestions) await window.openexam.db.addWrongQuestion(wq);
       } catch (err) { console.error('保存失败:', err); }
       onFinish(result);

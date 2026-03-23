@@ -144,7 +144,7 @@ export default function PracticeHistory({ onBack }) {
                   )}
                 </div>
                 <div className="hr-info">
-                  <span className="hr-title">{categoryNames[record.category] || record.category || '综合练习'}</span>
+                  <span className="hr-title">{record.paper_title || categoryNames[record.category] || record.category || '综合练习'}</span>
                   <span className="hr-meta">{formatDate(record.created_at)} · {record.total_count || 0}题 · {formatDuration(record.duration)}</span>
                 </div>
               </div>

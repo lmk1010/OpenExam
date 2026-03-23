@@ -1,6 +1,8 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const { app } = require('electron');
+const { normalizeQuestionTaxonomy, isFakeQuestion } = require('../shared/questionCategory');
+const achievementCatalog = require('../shared/achievementCatalog.json');
 
 let db = null;
 
@@ -507,7 +509,35 @@ function getSubCategoryStats(category) {
     FROM questions
     WHERE category = ?
     GROUP BY sub_category
+    ORDER BY count DESC, sub_category ASC
   `).all(category);
+}
+
+function repairQuestionTaxonomy() {
+  const rows = db.prepare('SELECT id, category, sub_category, content FROM questions').all();
+  const update = db.prepare('UPDATE questions SET category = ?, sub_category = ? WHERE id = ?');
+  let changed = 0;
+
+  db.transaction(() => {
+    rows.forEach((row) => {
+      const next = normalizeQuestionTaxonomy({
+        category: row.category,
+        sub_category: row.sub_category,
+        content: row.content,
+      });
+
+      if (next.category !== row.category || next.subCategory !== (row.sub_category || '')) {
+        update.run(next.category, next.subCategory, row.id);
+        changed += 1;
+      }
+    });
+  })();
+
+  return { total: rows.length, changed };
+}
+
+function repairQuestionCategories() {
+  return repairQuestionTaxonomy();
 }
 
 // 获取练习统计
@@ -578,9 +608,26 @@ function normalizeQuestionTags(tags) {
   return String(tags || '').trim();
 }
 
-// 导入试卷和题目
-function importPaper(paperData, questions) {
+const SAVED_AI_PAPER_TYPES = new Set(['ai_exam', 'ai_practice']);
+
+function normalizeSavedPaperType(type, fallback = 'imported') {
+  const value = String(type || '').trim().toLowerCase();
+  if (value === 'imported' || SAVED_AI_PAPER_TYPES.has(value)) return value;
+  return fallback;
+}
+
+function savePaperBundle(paperData = {}, questions = [], fallbackType = 'imported') {
+  const normalizedQuestions = Array.isArray(questions) ? questions.filter((question) => !isFakeQuestion(question)) : [];
+  if (!normalizedQuestions.length) throw new Error('没有可保存的有效题目');
+
+  const paperType = normalizeSavedPaperType(paperData.type, fallbackType);
   const paperId = `paper_${Date.now()}`;
+  const duration = Math.max(
+    paperType === 'ai_practice' ? 15 : 20,
+    Number(paperData.duration) || normalizedQuestions.length * 2 || 20
+  );
+  const difficulty = Math.max(1, Math.min(5, Number(paperData.difficulty) || 3));
+  const paperTitle = String(paperData.title || '').trim() || (paperType === 'ai_practice' ? 'AI 自定义练习' : '导入试卷');
 
   const insertPaper = db.prepare(`
     INSERT INTO papers (id, title, year, type, subject, province, question_count, duration, difficulty, created_at)
@@ -592,45 +639,57 @@ function importPaper(paperData, questions) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
   `);
 
-  const importTransaction = db.transaction(() => {
-    // 插入试卷
+  const saveTransaction = db.transaction(() => {
     insertPaper.run(
       paperId,
-      paperData.title || '导入试卷',
-      paperData.year || new Date().getFullYear(),
-      'imported',
-      'xingce',
-      null,
-      questions.length,
-      120,
-      3
+      paperTitle,
+      Number(paperData.year) || new Date().getFullYear(),
+      paperType,
+      String(paperData.subject || 'xingce').trim() || 'xingce',
+      paperData.province || null,
+      normalizedQuestions.length,
+      duration,
+      difficulty
     );
 
-    // 插入题目
-    questions.forEach((q, index) => {
+    normalizedQuestions.forEach((q, index) => {
       const questionId = `q_${Date.now()}_${index}`;
       const options = normalizeQuestionOptions(q.options);
-      const difficulty = Math.max(1, Math.min(5, Number(q.difficulty) || 2));
+      const content = String(q.content || '');
+      const taxonomy = normalizeQuestionTaxonomy({
+        category: q.category || paperData.category || 'yanyu',
+        subCategory: q.subCategory || q.sub_category || paperData.subCategory || '',
+        content,
+      });
       insertQuestion.run(
         questionId,
         paperId,
         index + 1,
         normalizeQuestionType(q.type),
-        q.category || 'yanyu',
-        q.subCategory || q.sub_category || '',
-        String(q.content || ''),
+        taxonomy.category,
+        taxonomy.subCategory,
+        content,
         JSON.stringify(options),
         String(q.answer || '').trim().toUpperCase(),
         q.analysis || '',
-        difficulty,
+        Math.max(1, Math.min(5, Number(q.difficulty) || difficulty || 2)),
         normalizeQuestionTags(q.tags)
       );
     });
   });
 
-  importTransaction();
+  saveTransaction();
 
-  return { paperId, questionCount: questions.length };
+  return { paperId, questionCount: normalizedQuestions.length, type: paperType, title: paperTitle };
+}
+
+// 导入试卷和题目
+function importPaper(paperData, questions) {
+  return savePaperBundle({ ...paperData, type: 'imported' }, questions, 'imported');
+}
+
+function saveAIPaper(paperData, questions) {
+  return savePaperBundle({ ...paperData, type: normalizeSavedPaperType(paperData?.type, 'ai_exam') }, questions, 'ai_exam');
 }
 
 // 获取导入的试卷列表
@@ -640,6 +699,49 @@ function getImportedPapers() {
     WHERE type = 'imported'
     ORDER BY created_at DESC
   `).all();
+}
+
+function getSavedAIPapers() {
+  return db.prepare(`
+    SELECT * FROM papers
+    WHERE type IN ('ai_exam', 'ai_practice')
+    ORDER BY created_at DESC
+  `).all();
+}
+
+function getSavedPaperForManage(paperId) {
+  const id = String(paperId || '').trim();
+  if (!id) throw new Error('内容不存在');
+
+  const paper = db.prepare('SELECT * FROM papers WHERE id = ?').get(id);
+  if (!paper) throw new Error('内容不存在或已删除');
+  if (!SAVED_AI_PAPER_TYPES.has(String(paper.type || '').trim())) throw new Error('仅支持管理已保存 AI 内容');
+
+  return paper;
+}
+
+function renameSavedPaper(paperId, title) {
+  const paper = getSavedPaperForManage(paperId);
+  const nextTitle = String(title || '').trim();
+  if (!nextTitle) throw new Error('名称不能为空');
+
+  db.prepare('UPDATE papers SET title = ? WHERE id = ?').run(nextTitle, paper.id);
+  return { ...paper, title: nextTitle };
+}
+
+function deleteSavedPaper(paperId) {
+  const paper = getSavedPaperForManage(paperId);
+
+  const remove = db.transaction(() => {
+    const removedPracticeRecords = db.prepare('DELETE FROM practice_records WHERE paper_id = ?').run(paper.id).changes;
+    const removedWrongQuestions = db.prepare('DELETE FROM wrong_questions WHERE paper_id = ?').run(paper.id).changes;
+    const removedQuestions = db.prepare('DELETE FROM questions WHERE paper_id = ?').run(paper.id).changes;
+    db.prepare('DELETE FROM papers WHERE id = ?').run(paper.id);
+    return { removedPracticeRecords, removedWrongQuestions, removedQuestions };
+  });
+
+  const summary = remove();
+  return { id: paper.id, title: paper.title, type: paper.type, ...summary };
 }
 
 // 按分类获取题目（用于专项练习）
@@ -765,64 +867,160 @@ function getHeatmapData(days = 90) {
   const rows = db.prepare(`
     SELECT
       DATE(start_time) as date,
-      SUM(total_count) as count
+      COUNT(*) as sessions,
+      COALESCE(SUM(total_count), 0) as count
     FROM practice_records
     WHERE start_time >= DATE('now', '-' || ? || ' days')
     GROUP BY DATE(start_time)
   `).all(days);
 
   const map = {};
-  rows.forEach(r => { map[r.date] = r.count; });
+  rows.forEach((row) => {
+    map[row.date] = {
+      count: row.count || 0,
+      sessions: row.sessions || 0,
+    };
+  });
 
   const result = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().slice(0, 10);
-    const count = map[dateStr] || 0;
-    // 分级：0=none, 1=1-10, 2=11-30, 3=31-60, 4=60+
+    const dayData = map[dateStr] || { count: 0, sessions: 0 };
+    const count = dayData.count;
+    const sessions = dayData.sessions;
+
     let level = 0;
-    if (count > 0 && count <= 10) level = 1;
+    if (count <= 0) level = 0;
+    else if (count <= 10) level = 1;
     else if (count <= 30) level = 2;
     else if (count <= 60) level = 3;
-    else if (count > 60) level = 4;
-    result.push({ date: dateStr, count, level });
+    else level = 4;
+
+    result.push({ date: dateStr, count, sessions, level });
   }
   return result;
 }
 
 // 获取成就解锁状态
-function getAchievements() {
-  const totalDone = db.prepare('SELECT COALESCE(SUM(total_count),0) as t FROM practice_records').get().t;
-  const streak = getStreakDays();
+function getAchievementMetrics(metrics = {}) {
+  const practiceStats = metrics.practiceStats || getPracticeStats();
+  const totalDone = practiceStats.totalDone || 0;
 
-  // 满分记录
-  const perfect = db.prepare(`
+  const perfectCount = db.prepare(`
     SELECT COUNT(*) as c FROM practice_records
     WHERE accuracy = 100 AND status = 'completed' AND paper_id IS NOT NULL
   `).get().c;
 
-  // 30秒内答对（duration<30 且至少1题对）
-  const speed = db.prepare(`
+  const speedCount = db.prepare(`
     SELECT COUNT(*) as c FROM practice_records
-    WHERE duration <= 30 AND correct_count >= 1
+    WHERE duration <= 30 AND correct_count >= 1 AND status = 'completed'
   `).get().c;
 
-  // 完成记录次数
-  const sessions = db.prepare(`SELECT COUNT(*) as c FROM practice_records`).get().c;
+  const sessions = db.prepare(`SELECT COUNT(*) as c FROM practice_records WHERE status = 'completed'`).get().c;
+  const wrongCount = db.prepare(`SELECT COUNT(*) as c FROM wrong_questions`).get().c;
+  const reviewCount = db.prepare(`SELECT COALESCE(SUM(review_count), 0) as c FROM wrong_questions`).get().c;
+  const studyDays = db.prepare(`SELECT COUNT(DISTINCT DATE(start_time)) as c FROM practice_records WHERE status = 'completed'`).get().c;
+  const categoryCoverage = db.prepare(`
+    SELECT COUNT(DISTINCT q.category) as c
+    FROM practice_records pr
+    JOIN json_each(pr.answers) answer_keys
+    INNER JOIN questions q ON q.id = answer_keys.key
+    WHERE pr.status = 'completed'
+  `).get().c;
+  const savedAIPapers = db.prepare(`SELECT COUNT(*) as c FROM papers WHERE type IN ('ai_exam', 'ai_practice')`).get().c;
 
-  // 掌握度（已做/总题数 × 100）
-  const totalQ = db.prepare('SELECT COUNT(*) as c FROM questions').get().c;
-  const mastery = totalQ > 0 ? Math.round((totalDone / totalQ) * 100) : 0;
+  const totalQuestions = db.prepare('SELECT COUNT(*) as c FROM questions').get().c;
+  const mastery = totalQuestions > 0 ? Math.round((totalDone / totalQuestions) * 100) : 0;
 
-  return [
-    { id: 'first', name: '初次答题', desc: '完成第一道题', unlocked: totalDone >= 1 },
-    { id: 'hundred', name: '百题斩', desc: '累计完成100道', unlocked: totalDone >= 100 },
-    { id: 'streak7', name: '连续7天', desc: '连续打卡7天', unlocked: streak >= 7 },
-    { id: 'perfect', name: '满分达人', desc: '模拟考试满分', unlocked: perfect >= 1 },
-    { id: 'speed', name: '速度之星', desc: '30秒内答对', unlocked: speed >= 1 },
-    { id: 'master', name: '知识大师', desc: '掌握度达80%', unlocked: mastery >= 80 },
-  ];
+  return {
+    sessions,
+    studyDays,
+    perfectCount,
+    speedCount,
+    wrongCount,
+    reviewCount,
+    categoryCoverage,
+    savedAIPapers,
+    totalQuestions,
+    mastery,
+  };
+}
+
+function getAchievements(metrics = {}) {
+  const practiceStats = metrics.practiceStats || getPracticeStats();
+  const totalDone = Number(practiceStats.totalDone) || 0;
+  const accuracy = Number(practiceStats.accuracy) || 0;
+  const streak = typeof metrics.streak === 'number' ? metrics.streak : getStreakDays();
+  const totalMinutes = typeof metrics.totalMinutes === 'number' ? metrics.totalMinutes : getTotalStudyMinutes();
+  const achievementMetrics = metrics.achievementMetrics || getAchievementMetrics({ practiceStats });
+  const context = {
+    totalDone,
+    accuracy,
+    streak,
+    totalMinutes,
+    sessions: Number(achievementMetrics.sessions) || 0,
+    studyDays: Number(achievementMetrics.studyDays) || 0,
+    perfectCount: Number(achievementMetrics.perfectCount) || 0,
+    speedCount: Number(achievementMetrics.speedCount) || 0,
+    wrongCount: Number(achievementMetrics.wrongCount) || 0,
+    reviewCount: Number(achievementMetrics.reviewCount) || 0,
+    categoryCoverage: Number(achievementMetrics.categoryCoverage) || 0,
+    savedAIPapers: Number(achievementMetrics.savedAIPapers) || 0,
+    totalQuestions: Number(achievementMetrics.totalQuestions) || 0,
+    mastery: Number(achievementMetrics.mastery) || 0,
+  };
+
+  const clamp = (value, max) => Math.max(0, Math.min(Number(value) || 0, max));
+  const ratio = (value, max) => max > 0 ? Math.max(0, Math.min((Number(value) || 0) / max, 1)) : 0;
+  const buildRequirementProgress = (requirement) => {
+    const target = Number(requirement.target) || 0;
+    const current = Number(context[requirement.metric]) || 0;
+    return {
+      current,
+      target,
+      progressRatio: ratio(current, target),
+      text: `${clamp(current, target)}/${target}${requirement.suffix || ''}`,
+    };
+  };
+
+  return achievementCatalog.map((definition) => {
+    if (definition.type === 'combo') {
+      const parts = (definition.requirements || []).map(buildRequirementProgress);
+      const progressRatio = parts.length > 0 ? Math.min(...parts.map((item) => item.progressRatio)) : 0;
+      const unlocked = parts.length > 0 && parts.every((item) => item.current >= item.target);
+      return {
+        id: definition.id,
+        name: definition.name,
+        desc: definition.desc,
+        group: definition.group,
+        tier: definition.tier,
+        iconKey: definition.iconKey,
+        unlocked,
+        progress: unlocked ? 1 : 0,
+        target: 1,
+        progressRatio,
+        progressText: parts.map((item) => item.text).join(' · '),
+      };
+    }
+
+    const current = Number(context[definition.metric]) || 0;
+    const target = Number(definition.target) || 0;
+    return {
+      id: definition.id,
+      name: definition.name,
+      desc: definition.desc,
+      group: definition.group,
+      tier: definition.tier,
+      iconKey: definition.iconKey,
+      unlocked: current >= target,
+      progress: clamp(current, target),
+      target,
+      progressRatio: ratio(current, target),
+      progressText: `${clamp(current, target)}/${target}${definition.suffix || ''}`,
+    };
+  });
 }
 
 // 获取综合成长中心数据（一次性聚合）
@@ -830,9 +1028,10 @@ function getGrowthData() {
   const streak = getStreakDays();
   const today = getTodayStats();
   const heatmap = getHeatmapData(90);
-  const achievements = getAchievements();
   const practiceStats = getPracticeStats();
   const totalMinutes = getTotalStudyMinutes();
+  const achievementMetrics = getAchievementMetrics({ practiceStats });
+  const achievements = getAchievements({ practiceStats, totalMinutes, streak, achievementMetrics });
 
   // 计算等级 EXP（基于总做题数）
   const totalDone = practiceStats.totalDone || 0;
@@ -849,6 +1048,7 @@ function getGrowthData() {
     today,
     heatmap,
     achievements,
+    achievementMetrics,
     practiceStats,
     totalMinutes,
     level,
@@ -1083,9 +1283,15 @@ module.exports = {
   reviewWrongQuestion,
   getCategoryStats,
   getSubCategoryStats,
+  repairQuestionCategories,
+  repairQuestionTaxonomy,
   getPracticeStats,
   importPaper,
+  saveAIPaper,
   getImportedPapers,
+  getSavedAIPapers,
+  renameSavedPaper,
+  deleteSavedPaper,
   getQuestionsByCategory,
   getDailyStats,
   getStreakDays,

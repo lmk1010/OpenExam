@@ -35,7 +35,26 @@ function normalizeErrorMessage(error, fallback = "生成失败，请稍后重试
   return raw;
 }
 
-export default function AIGenerate({ onStartExam }) {
+function getSavedPaperMeta(type) {
+  if (type === "ai_practice") {
+    return {
+      label: "AI 练习",
+      action: "开始练习",
+      color: "#059669",
+      background: "rgba(16,185,129,0.12)",
+      border: "rgba(16,185,129,0.18)",
+    };
+  }
+  return {
+    label: "AI 试卷",
+    action: "开始答题",
+    color: "var(--accent)",
+    background: "rgba(109,94,251,0.1)",
+    border: "rgba(109,94,251,0.16)",
+  };
+}
+
+export default function AIGenerate({ onOpenPaper }) {
   const [config, setConfig] = useState({ category: "yanyu", difficulty: 3, count: 10, customPrompt: "" });
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(null);
@@ -48,6 +67,11 @@ export default function AIGenerate({ onStartExam }) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [historyPapers, setHistoryPapers] = useState([]);
+  const [saveTitle, setSaveTitle] = useState("");
+  const [lastSavedPaper, setLastSavedPaper] = useState(null);
+  const [editingPaperId, setEditingPaperId] = useState("");
+  const [editingTitle, setEditingTitle] = useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState("");
   const [actionBusy, setActionBusy] = useState("");
   const progressTimerRef = useRef(null);
   const startedAtRef = useRef(0);
@@ -85,6 +109,12 @@ export default function AIGenerate({ onStartExam }) {
     return () => stopProgressTicker();
   }, []);
 
+  useEffect(() => {
+    if (generated?.title) {
+      setSaveTitle(generated.title);
+    }
+  }, [generated?.title]);
+
   const handleGenerate = async () => {
     const token = generationTokenRef.current + 1;
     generationTokenRef.current = token;
@@ -101,6 +131,10 @@ export default function AIGenerate({ onStartExam }) {
     setPhaseText("校验配置");
     setElapsedMs(0);
     setGenerated(null);
+    setLastSavedPaper(null);
+    setEditingPaperId("");
+    setEditingTitle("");
+    setPendingDeleteId("");
     startedAtRef.current = Date.now();
     pushFeedback("info", "开始生成试卷。");
     stopProgressTicker();
@@ -157,24 +191,51 @@ export default function AIGenerate({ onStartExam }) {
     finishWithError("已取消本次生成，请调整参数后重试。", "已取消", "warning");
   };
 
-  const getGeneratedPaperPayload = () => ({
-    paper: { title: generated?.title || "AI 智能试卷", year: new Date().getFullYear(), duration: Math.max(20, (generated?.count || 0) * 2), type: "custom", subject: "xingce", question_count: generated?.count || 0, difficulty: config.difficulty },
+  const getGeneratedPaperPayload = (titleOverride = saveTitle) => ({
+    paper: {
+      title: String(titleOverride || generated?.title || "AI 智能试卷").trim() || "AI 智能试卷",
+      year: new Date().getFullYear(),
+      duration: Math.max(20, (generated?.count || 0) * 2),
+      type: "ai_exam",
+      subject: "xingce",
+      question_count: generated?.count || 0,
+      difficulty: config.difficulty,
+    },
     questions: generated?.questions || [],
   });
 
-  const handleSave = async () => {
-    if (!generated?.questions?.length || !window.openexam?.db) return;
-    setActionBusy("save");
+  const handleSave = async (targetType) => {
+    if (!generated?.questions?.length || !window.openexam?.db?.saveAIPaper) return;
+    const title = String(saveTitle || generated?.title || "").trim();
+    if (!title) {
+      pushFeedback("warning", "请先填写保存名称。");
+      return;
+    }
+    setActionBusy(`save:${targetType}`);
     try {
-      const r = await window.openexam.db.importPaper({ title: generated.title, year: new Date().getFullYear() }, generated.questions);
-      pushFeedback("success", `已导入题库：${r.questionCount} 道题。`);
-      if (showHistory) {
-        await loadHistoryPapers();
-      }
-      alert(`已保存 ${r.questionCount} 道题`);
+      const r = await window.openexam.db.saveAIPaper({
+        title,
+        year: new Date().getFullYear(),
+        difficulty: config.difficulty,
+        duration: Math.max(targetType === "ai_practice" ? 15 : 20, (generated?.count || 0) * 2),
+        type: targetType,
+      }, generated.questions);
+      const savedPaper = {
+        id: r.paperId,
+        title: r.title || title,
+        type: r.type || targetType,
+        question_count: r.questionCount || generated.questions.length,
+        year: new Date().getFullYear(),
+      };
+      setLastSavedPaper(savedPaper);
+      setEditingPaperId("");
+      setEditingTitle("");
+      setPendingDeleteId("");
+      setShowHistory(true);
+      await loadHistoryPapers();
+      pushFeedback("success", `${targetType === "ai_practice" ? "已保存自定义练习" : "已保存自定义试卷"}：${r.questionCount} 道题。`);
     } catch (e) {
       pushFeedback("error", `保存失败：${e.message || "未知错误"}`);
-      alert("保存失败: " + e.message);
     } finally {
       setActionBusy("");
     }
@@ -207,21 +268,21 @@ export default function AIGenerate({ onStartExam }) {
   };
 
   const loadHistoryPapers = async () => {
-    if (!window.openexam?.db?.getImportedPapers) {
-      setHistoryError("当前环境不支持历史试卷读取。");
+    if (!window.openexam?.db?.getSavedAIPapers) {
+      setHistoryError("当前环境不支持 AI 保存内容读取。");
       return;
     }
     setHistoryLoading(true);
     setHistoryError("");
     try {
-      const rows = await window.openexam.db.getImportedPapers();
+      const rows = await window.openexam.db.getSavedAIPapers();
       const list = Array.isArray(rows) ? rows : [];
       setHistoryPapers(list);
       if (!list.length) {
-        setHistoryError("暂无历史试卷，请先生成并保存。");
+        setHistoryError("暂无已保存内容，请先生成后点击保存。");
       }
     } catch (e) {
-      setHistoryError(e.message || "读取历史试卷失败");
+      setHistoryError(e.message || "读取已保存内容失败");
       setHistoryPapers([]);
     } finally {
       setHistoryLoading(false);
@@ -236,12 +297,69 @@ export default function AIGenerate({ onStartExam }) {
     }
   };
 
-  const handleStartHistoryPaper = async (paperId) => {
-    if (!paperId || !onStartExam) return;
+  const handleStartHistoryPaper = async (paper) => {
+    if (!paper?.id || !onOpenPaper) return;
     try {
-      await onStartExam(paperId);
+      await onOpenPaper(paper);
     } catch (e) {
-      setHistoryError(e.message || "启动试卷失败");
+      setHistoryError(e.message || "启动内容失败");
+    }
+  };
+
+  const handleBeginRenamePaper = (paper) => {
+    setPendingDeleteId("");
+    setEditingPaperId(paper?.id || "");
+    setEditingTitle(String(paper?.title || ""));
+  };
+
+  const handleCancelRenamePaper = () => {
+    setEditingPaperId("");
+    setEditingTitle("");
+  };
+
+  const handleConfirmRenamePaper = async (paperId) => {
+    const title = String(editingTitle || "").trim();
+    if (!paperId || !window.openexam?.db?.renameSavedPaper) return;
+    if (!title) {
+      pushFeedback("warning", "名称不能为空。");
+      return;
+    }
+    setActionBusy(`rename:${paperId}`);
+    try {
+      const updated = await window.openexam.db.renameSavedPaper(paperId, title);
+      setHistoryPapers((prev) => prev.map((paper) => (paper.id === paperId ? { ...paper, title: updated.title } : paper)));
+      setLastSavedPaper((prev) => (prev?.id === paperId ? { ...prev, title: updated.title } : prev));
+      setEditingPaperId("");
+      setEditingTitle("");
+      pushFeedback("success", `已重命名：${updated.title}`);
+    } catch (e) {
+      pushFeedback("error", `重命名失败：${e.message || "未知错误"}`);
+    } finally {
+      setActionBusy("");
+    }
+  };
+
+  const handleAskDeletePaper = (paperId) => {
+    setEditingPaperId("");
+    setEditingTitle("");
+    setPendingDeleteId((prev) => (prev === paperId ? "" : paperId));
+  };
+
+  const handleDeletePaper = async (paper) => {
+    if (!paper?.id || !window.openexam?.db?.deleteSavedPaper) return;
+    setActionBusy(`delete:${paper.id}`);
+    try {
+      const removed = await window.openexam.db.deleteSavedPaper(paper.id);
+      if (lastSavedPaper?.id === paper.id) {
+        setLastSavedPaper(null);
+      }
+      setPendingDeleteId("");
+      await loadHistoryPapers();
+      pushFeedback("success", `已删除：${removed.title}`);
+    } catch (e) {
+      pushFeedback("error", `删除失败：${e.message || "未知错误"}`);
+    } finally {
+      setActionBusy("");
     }
   };
 
@@ -385,7 +503,7 @@ export default function AIGenerate({ onStartExam }) {
                 cursor: "pointer",
               }}
             >
-              历史试卷
+              已保存
             </button>
           </div>
 
@@ -415,10 +533,29 @@ export default function AIGenerate({ onStartExam }) {
             </div>
           )}
 
+          {lastSavedPaper && (
+            <div style={{ border: "1px solid rgba(16,185,129,0.16)", borderRadius: 12, background: "linear-gradient(180deg, rgba(16,185,129,0.08), rgba(16,185,129,0.03))", padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#047857" }}>已持久化保存</div>
+                <div style={{ fontSize: 11, color: "var(--text)", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {lastSavedPaper.title} · {lastSavedPaper.type === "ai_practice" ? "AI 练习" : "AI 试卷"}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <button onClick={() => handleStartHistoryPaper(lastSavedPaper)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(16,185,129,0.22)", background: "#fff", color: "#047857", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                  立即使用
+                </button>
+                <button onClick={() => setShowHistory((prev) => !prev)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(16,185,129,0.14)", background: "rgba(255,255,255,0.72)", color: "#047857", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                  {showHistory ? "收起列表" : "查看已保存"}
+                </button>
+              </div>
+            </div>
+          )}
+
           {showHistory && (
             <div style={{ border: "1px solid var(--line)", borderRadius: 10, background: "var(--surface)", padding: "12px 12px 10px", display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>历史试卷（持久化）</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>已保存试卷 / 练习{historyPapers.length ? `（${historyPapers.length}）` : ""}</div>
                 <button onClick={loadHistoryPapers} disabled={historyLoading} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 11, cursor: historyLoading ? "wait" : "pointer" }}>
                   {historyLoading ? "刷新中..." : "刷新"}
                 </button>
@@ -427,24 +564,101 @@ export default function AIGenerate({ onStartExam }) {
                 <div style={{ fontSize: 11, color: "#c0392b", lineHeight: 1.5 }}>{historyError}</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 180, overflowY: "auto", paddingRight: 2 }}>
-                  {historyPapers.map((paper) => (
-                    <div key={paper.id} style={{ border: "1px solid var(--line)", borderRadius: 8, padding: "8px 10px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 12, color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {paper.title || "未命名试卷"}
-                        </div>
-                        <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
-                          {paper.year || "-"} · {(paper.question_count || 0)} 题 · {paper.created_at?.slice(0, 16).replace("T", " ") || "-"}
-                        </div>
+                  {historyPapers.map((paper) => {
+                    const meta = getSavedPaperMeta(paper.type);
+                    const isJustSaved = lastSavedPaper?.id === paper.id;
+                    const isEditing = editingPaperId === paper.id;
+                    const isPendingDelete = pendingDeleteId === paper.id;
+                    const isBusy = actionBusy === `rename:${paper.id}` || actionBusy === `delete:${paper.id}`;
+                    return (
+                    <div key={paper.id} style={{ border: isJustSaved ? `1px solid ${meta.border}` : "1px solid var(--line)", borderRadius: 8, padding: "8px 10px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: isJustSaved ? meta.background : "transparent", boxShadow: isJustSaved ? "0 6px 18px rgba(15,23,42,0.06)" : "none" }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        {isEditing ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            <input
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              placeholder="输入新的名称"
+                              style={{ width: "100%", padding: "7px 9px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--text)", fontSize: 12, outline: "none" }}
+                            />
+                            <div style={{ fontSize: 10, color: "var(--muted)" }}>仅修改保存名称，不影响题目内容。</div>
+                          </div>
+                        ) : (
+                          <>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                              <div style={{ fontSize: 12, color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {paper.title || "未命名内容"}
+                              </div>
+                              <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 999, color: meta.color, background: meta.background, border: `1px solid ${meta.border}` }}>
+                                {meta.label}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
+                              {paper.year || "-"} · {(paper.question_count || 0)} 题 · {paper.created_at?.slice(0, 16).replace("T", " ") || "-"}
+                            </div>
+                          </>
+                        )}
                       </div>
-                      <button
-                        onClick={() => handleStartHistoryPaper(paper.id)}
-                        style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--accent)", background: "rgba(109,94,251,0.08)", color: "var(--accent)", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
-                      >
-                        开始答题
-                      </button>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        {isEditing ? (
+                          <>
+                            <button
+                              onClick={() => handleConfirmRenamePaper(paper.id)}
+                              disabled={isBusy}
+                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid rgba(109,94,251,0.18)", background: "rgba(109,94,251,0.08)", color: "var(--accent)", fontSize: 11, cursor: isBusy ? "wait" : "pointer", fontWeight: 600 }}
+                            >
+                              {actionBusy === `rename:${paper.id}` ? "保存中..." : "保存"}
+                            </button>
+                            <button
+                              onClick={handleCancelRenamePaper}
+                              disabled={isBusy}
+                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--muted)", fontSize: 11, cursor: isBusy ? "wait" : "pointer", fontWeight: 600 }}
+                            >
+                              取消
+                            </button>
+                          </>
+                        ) : isPendingDelete ? (
+                          <>
+                            <button
+                              onClick={() => handleDeletePaper(paper)}
+                              disabled={isBusy}
+                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#b42318", fontSize: 11, cursor: isBusy ? "wait" : "pointer", fontWeight: 600 }}
+                            >
+                              {actionBusy === `delete:${paper.id}` ? "删除中..." : "确认删除"}
+                            </button>
+                            <button
+                              onClick={() => setPendingDeleteId("")}
+                              disabled={isBusy}
+                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--muted)", fontSize: 11, cursor: isBusy ? "wait" : "pointer", fontWeight: 600 }}
+                            >
+                              取消
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleStartHistoryPaper(paper)}
+                              style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${meta.border}`, background: meta.background, color: meta.color, fontSize: 11, cursor: "pointer", fontWeight: 600 }}
+                            >
+                              {meta.action}
+                            </button>
+                            <button
+                              onClick={() => handleBeginRenamePaper(paper)}
+                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--text)", fontSize: 11, cursor: "pointer", fontWeight: 600 }}
+                            >
+                              重命名
+                            </button>
+                            <button
+                              onClick={() => handleAskDeletePaper(paper.id)}
+                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.14)", background: "rgba(239,68,68,0.05)", color: "#b42318", fontSize: 11, cursor: "pointer", fontWeight: 600 }}
+                            >
+                              删除
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  ))}
+                  );})}
                 </div>
               )}
             </div>
@@ -452,24 +666,42 @@ export default function AIGenerate({ onStartExam }) {
           
           {generated ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 12, overflow: "auto", paddingRight: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "rgba(109,94,251,0.04)", borderRadius: 8, border: "1px solid rgba(109,94,251,0.1)" }}>
-                <div style={{ width: 28, height: 28, borderRadius: 6, background: "rgba(109,94,251,0.1)", color: "var(--accent)", display: "grid", placeItems: "center" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 16px", background: "linear-gradient(180deg, rgba(109,94,251,0.06), rgba(109,94,251,0.02))", borderRadius: 12, border: "1px solid rgba(109,94,251,0.12)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 6, background: "rgba(109,94,251,0.1)", color: "var(--accent)", display: "grid", placeItems: "center" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{generated.title}</div>
+                    <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>共 {generated.count} 道题目 · {generated.time}</div>
+                  </div>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{generated.title}</div>
-                  <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>共 {generated.count} 道题目 · {generated.time}</div>
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button onClick={handleSave} disabled={!!actionBusy} style={{ background: "var(--surface)", color: "var(--accent)", border: "1px solid var(--accent)", fontSize: 11, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer", transition: "all 0.2s" }}>
-                    {actionBusy === "save" ? "保存中..." : "保存并入库"}
-                  </button>
-                  <button onClick={handleExportGeneratedPdf} disabled={!!actionBusy} style={{ background: "var(--surface)", color: "var(--text)", border: "1px solid var(--line)", fontSize: 11, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer" }}>
-                    {actionBusy === "pdf" ? "导出中..." : "导出 PDF"}
-                  </button>
-                  <button onClick={handleShareGenerated} disabled={!!actionBusy} style={{ background: "rgba(109,94,251,0.08)", color: "var(--accent)", border: "1px solid rgba(109,94,251,0.16)", fontSize: 11, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer" }}>
-                    {actionBusy === "share" ? "复制中..." : "复制分享"}
-                  </button>
+
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, alignItems: "center" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <input
+                      value={saveTitle}
+                      onChange={(e) => setSaveTitle(e.target.value)}
+                      placeholder="输入保存名称，例如：言语理解冲刺卷"
+                      style={{ width: "100%", padding: "9px 11px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--text)", fontSize: 12, outline: "none" }}
+                    />
+                    <div style={{ fontSize: 10, color: "var(--muted)" }}>点击保存后将持久化到本地，重启应用后仍可在“已保存”中继续使用。</div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <button onClick={() => handleSave("ai_exam")} disabled={!!actionBusy} style={{ background: "var(--surface)", color: "var(--accent)", border: "1px solid var(--accent)", fontSize: 11, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer", transition: "all 0.2s" }}>
+                      {actionBusy === "save:ai_exam" ? "保存中..." : "保存试卷"}
+                    </button>
+                    <button onClick={() => handleSave("ai_practice")} disabled={!!actionBusy} style={{ background: "rgba(16,185,129,0.08)", color: "#059669", border: "1px solid rgba(16,185,129,0.18)", fontSize: 11, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer" }}>
+                      {actionBusy === "save:ai_practice" ? "保存中..." : "保存练习"}
+                    </button>
+                    <button onClick={handleExportGeneratedPdf} disabled={!!actionBusy} style={{ background: "var(--surface)", color: "var(--text)", border: "1px solid var(--line)", fontSize: 11, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer" }}>
+                      {actionBusy === "pdf" ? "导出中..." : "导出 PDF"}
+                    </button>
+                    <button onClick={handleShareGenerated} disabled={!!actionBusy} style={{ background: "rgba(109,94,251,0.08)", color: "var(--accent)", border: "1px solid rgba(109,94,251,0.16)", fontSize: 11, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer" }}>
+                      {actionBusy === "share" ? "复制中..." : "复制分享"}
+                    </button>
+                  </div>
                 </div>
               </div>
               

@@ -11,6 +11,7 @@ import AIGenerate from "./pages/AIGenerate.jsx";
 import WrongBook from "./pages/WrongBook.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import GrowthCenter from "./pages/GrowthCenter.jsx";
+import AchievementCenter from "./pages/AchievementCenter.jsx";
 import OnboardingTour from "./components/OnboardingTour.jsx";
 import { actions, getState } from "./store/examStore.js";
 import { normalizeAISettings } from "./store/aiSettings.js";
@@ -222,11 +223,49 @@ export default function App() {
     />
   );
 
-  const handleStartExam = async (paperId) => {
+  const getReturnTab = (targetPage) => ({
+    practice: "题库练习",
+    papers: "模拟考试",
+    "ai-generate": "AI出卷",
+  }[targetPage] || "学习中心");
+
+  const handleStartExam = async (paperId, options = {}) => {
     await actions.startExam(paperId);
     setCurrentPaperId(paperId);
-    setResultReturnPage("papers");
+    setResultReturnPage(options.returnPage || "papers");
     setPage("exam");
+  };
+
+  const handleStartSavedPractice = async (paperId, paperTitle, returnPage = "practice") => {
+    if (!window.openexam?.db?.getQuestions) {
+      alert('数据库未连接');
+      return;
+    }
+
+    try {
+      const questions = await window.openexam.db.getQuestions(paperId);
+      if (!questions.length) {
+        alert('该练习暂无题目');
+        return;
+      }
+      setPracticeQuestions(questions);
+      setPracticeConfig({ mode: 'practice', title: paperTitle || 'AI 自定义练习', sourcePaperId: paperId });
+      setResultReturnPage(returnPage);
+      setPage("practice-exam");
+    } catch (err) {
+      console.error('加载练习失败:', err);
+      alert('加载练习失败');
+    }
+  };
+
+  const handleOpenPaper = async (paper, returnPage = "papers") => {
+    const target = paper && typeof paper === 'object' ? paper : { id: paper };
+    if (!target?.id) return;
+    if (target.type === 'ai_practice') {
+      await handleStartSavedPractice(target.id, target.title, returnPage);
+      return;
+    }
+    await handleStartExam(target.id, { returnPage });
   };
 
   const handleFinishExam = (result) => {
@@ -268,7 +307,9 @@ export default function App() {
 
   const handleExitExam = () => {
     actions.resetExam();
-    setPage("papers");
+    setCurrentPaperId(null);
+    setActiveTab(getReturnTab(resultReturnPage));
+    setPage(resultReturnPage);
   };
 
   const handleBackToList = () => {
@@ -277,7 +318,7 @@ export default function App() {
     setCurrentPaperId(null);
     setPracticeQuestions(null);
     setPracticeConfig(null);
-    setActiveTab(resultReturnPage === 'practice' ? '题库练习' : '模拟考试');
+    setActiveTab(getReturnTab(resultReturnPage));
     setPage(resultReturnPage);
   };
 
@@ -314,7 +355,8 @@ export default function App() {
           onExit={() => {
             setPracticeQuestions(null);
             setPracticeConfig(null);
-            setPage("practice");
+            setActiveTab(getReturnTab(resultReturnPage));
+            setPage(resultReturnPage);
           }}
         />
         {onboarding}
@@ -427,7 +469,7 @@ export default function App() {
 
           <div className="workspace-body">
             {page === "papers" ? (
-              <PaperList onStartExam={handleStartExam} />
+              <PaperList onOpenPaper={(paper) => handleOpenPaper(paper, 'papers')} />
             ) : page === "practice" ? (
               <PracticeModule onImport={() => setPage("import")} onStartPractice={handleStartPractice} onHistory={() => setPage("history")} />
             ) : page === "history" ? (
@@ -444,7 +486,7 @@ export default function App() {
             ) : page === "settings" ? (
               <Settings onBack={() => setPage("home")} />
             ) : page === "ai-generate" ? (
-              <AIGenerate onStartExam={handleStartExam} />
+              <AIGenerate onOpenPaper={(paper) => handleOpenPaper(paper, 'ai-generate')} />
             ) : page === "ai-teacher" ? (
               <AITeacher />
             ) : page === "wrong-book" ? (
@@ -452,7 +494,9 @@ export default function App() {
             ) : page === "analytics" ? (
               <Analytics onOpenSettings={() => setPage("settings")} />
             ) : page === "growth" ? (
-              <GrowthCenter />
+              <GrowthCenter onOpenAchievements={() => { setActiveTab("我的成长"); setPage("achievements"); }} />
+            ) : page === "achievements" ? (
+              <AchievementCenter onBack={() => { setActiveTab("我的成长"); setPage("growth"); }} />
             ) : (
               <OriginalHomePage />
             )}

@@ -42,7 +42,26 @@ const PROVINCES = [
 
 const PAGE_SIZE = 12;
 
-export default function PaperList({ onStartExam }) {
+function getPaperBadge(paper) {
+  switch (paper?.type) {
+    case 'national':
+      return { label: '国考', className: 'national' };
+    case 'ai_exam':
+      return { label: 'AI试卷', className: 'ai-exam' };
+    case 'ai_practice':
+      return { label: 'AI练习', className: 'ai-practice' };
+    case 'imported':
+      return { label: '导入', className: 'imported' };
+    default:
+      return { label: paper?.province || '省考', className: 'provincial' };
+  }
+}
+
+function getPaperActionLabel(paper) {
+  return paper?.type === 'ai_practice' ? '开始练习' : '开始答题';
+}
+
+export default function PaperList({ onOpenPaper }) {
   const [papers, setPapers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedProvince, setSelectedProvince] = useState('all');
@@ -92,8 +111,8 @@ export default function PaperList({ onStartExam }) {
     setCurrentPage(1);
   }, [selectedProvince, selectedYear]);
 
-  const handleStart = async (paperId) => {
-    onStartExam?.(paperId);
+  const handleStart = async (paper) => {
+    onOpenPaper?.(paper);
   };
 
   const handleExportPaper = async (paper) => {
@@ -182,12 +201,14 @@ export default function PaperList({ onStartExam }) {
 
       {/* 试卷列表 */}
       <div className="paper-grid">
-        {paginatedPapers.map(paper => (
+        {paginatedPapers.map(paper => {
+          const badge = getPaperBadge(paper);
+          return (
           <div key={paper.id} className="paper-card">
             <div className="paper-card-header">
               <span className="paper-year">{paper.year}</span>
-              <span className={`paper-type ${paper.type}`}>
-                {paper.type === 'national' ? '国考' : paper.province || '省考'}
+              <span className={`paper-type ${badge.className}`}>
+                {badge.label}
               </span>
             </div>
             <h3 className="paper-title">{paper.title}</h3>
@@ -199,8 +220,8 @@ export default function PaperList({ onStartExam }) {
               </span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, marginTop: 14 }}>
-              <button className="paper-start-btn" onClick={() => handleStart(paper.id)} style={{ margin: 0 }}>
-                开始答题
+              <button className="paper-start-btn" onClick={() => handleStart(paper)} style={{ margin: 0 }}>
+                {getPaperActionLabel(paper)}
               </button>
               <button onClick={() => handleExportPaper(paper)} disabled={busyAction === `pdf:${paper.id}`} style={{ padding: '0 12px', borderRadius: 12, border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: busyAction ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
                 {busyAction === `pdf:${paper.id}` ? '导出中...' : 'PDF'}
@@ -210,7 +231,7 @@ export default function PaperList({ onStartExam }) {
               </button>
             </div>
           </div>
-        ))}
+        );})}
       </div>
 
       {/* 空状态 */}

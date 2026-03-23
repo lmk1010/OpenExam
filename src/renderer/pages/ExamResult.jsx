@@ -126,6 +126,8 @@ export default function ExamResult({ result, onBack }) {
   const wrongCount = result?.wrongCount ?? Math.max(answeredCount - correctCount, 0);
 
   const level = getScoreLevel(accuracy);
+  const resultTitle = result?.paperTitle || result?.config?.title || (result?.config?.category ? categoryNames[result.config.category] || '专项练习' : '练习完成');
+  const resultSubtitle = `${correctCount} 正确 · ${wrongCount} 错误 · ${formatDuration(timeElapsed)}`;
 
   // 解析页面
   if (showAnalysis && currentQuestion) {
@@ -216,8 +218,11 @@ export default function ExamResult({ result, onBack }) {
             </div>
           </div>
           <div className="score-info">
-            <h2>{result?.config?.category ? categoryNames[result.config.category] || '专项练习' : '练习完成'}</h2>
-            <span className="score-badge" style={{ background: `${level.color}15`, color: level.color }}>{level.text}</span>
+            <div className="score-info-row">
+              <h2>{resultTitle}</h2>
+              <span className="score-badge" style={{ background: `${level.color}15`, color: level.color }}>{level.text}</span>
+            </div>
+            <span className="score-subtext">{resultSubtitle}</span>
           </div>
         </div>
 

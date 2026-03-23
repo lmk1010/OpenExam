@@ -114,8 +114,24 @@ ipcMain.handle("db:importPaper", (event, { paperData, questions }) => {
   return database.importPaper(paperData, questions);
 });
 
+ipcMain.handle("db:saveAIPaper", (event, { paperData, questions }) => {
+  return database.saveAIPaper(paperData, questions);
+});
+
 ipcMain.handle("db:getImportedPapers", () => {
   return database.getImportedPapers();
+});
+
+ipcMain.handle("db:getSavedAIPapers", () => {
+  return database.getSavedAIPapers();
+});
+
+ipcMain.handle("db:renameSavedPaper", (event, { paperId, title }) => {
+  return database.renameSavedPaper(paperId, title);
+});
+
+ipcMain.handle("db:deleteSavedPaper", (event, { paperId }) => {
+  return database.deleteSavedPaper(paperId);
 });
 
 ipcMain.handle("db:getQuestionsByCategory", (event, { category, subCategory, limit, shuffle }) => {

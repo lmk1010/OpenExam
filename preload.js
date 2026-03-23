@@ -20,7 +20,11 @@ contextBridge.exposeInMainWorld("openexam", {
     getSubCategoryStats: (category) => ipcRenderer.invoke("db:getSubCategoryStats", category),
     getPracticeStats: () => ipcRenderer.invoke("db:getPracticeStats"),
     importPaper: (paperData, questions) => ipcRenderer.invoke("db:importPaper", { paperData, questions }),
+    saveAIPaper: (paperData, questions) => ipcRenderer.invoke("db:saveAIPaper", { paperData, questions }),
     getImportedPapers: () => ipcRenderer.invoke("db:getImportedPapers"),
+    getSavedAIPapers: () => ipcRenderer.invoke("db:getSavedAIPapers"),
+    renameSavedPaper: (paperId, title) => ipcRenderer.invoke("db:renameSavedPaper", { paperId, title }),
+    deleteSavedPaper: (paperId) => ipcRenderer.invoke("db:deleteSavedPaper", { paperId }),
     getQuestionsByCategory: (category, subCategory, limit, shuffle) =>
       ipcRenderer.invoke("db:getQuestionsByCategory", { category, subCategory, limit, shuffle }),
     getDailyStats: (days) => ipcRenderer.invoke("db:getDailyStats", days),

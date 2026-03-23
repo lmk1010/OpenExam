@@ -4,6 +4,32 @@ const { app } = require('electron');
 
 let db = null;
 
+const REVIEW_INTERVAL_DAYS = [0, 1, 2, 4, 7, 15, 30];
+
+function toSQLiteDateTime(input = new Date()) {
+  const date = input instanceof Date ? input : new Date(input);
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function parseSQLiteDateTime(value) {
+  if (!value) return null;
+  const normalized = String(value).replace(' ', 'T');
+  const withZone = /z$/i.test(normalized) ? normalized : `${normalized}Z`;
+  const date = new Date(withZone);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function addDays(dateTime, days = 0) {
+  const next = new Date(dateTime instanceof Date ? dateTime : new Date(dateTime));
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function getNextReviewAt(stage = 0, from = new Date()) {
+  const safeStage = Math.max(0, Math.min(stage, REVIEW_INTERVAL_DAYS.length - 1));
+  return toSQLiteDateTime(addDays(from, REVIEW_INTERVAL_DAYS[safeStage] || 0));
+}
+
 function ensurePracticeRecordsSchema() {
   const columns = db.pragma('table_info(practice_records)');
   if (!Array.isArray(columns) || !columns.length) return;
@@ -68,6 +94,38 @@ function ensurePracticeRecordsSchema() {
       ALTER TABLE practice_records_new RENAME TO practice_records;
     `);
   })();
+}
+
+function ensureWrongQuestionsSchema() {
+  const columns = db.pragma('table_info(wrong_questions)');
+  if (!Array.isArray(columns) || !columns.length) return;
+
+  const byName = new Set(columns.map((column) => column.name));
+  const additions = [
+    ['review_count', 'INTEGER DEFAULT 0'],
+    ['last_review', 'TEXT'],
+    ['next_review_at', 'TEXT'],
+    ['review_stage', 'INTEGER DEFAULT 0'],
+  ];
+
+  additions.forEach(([name, definition]) => {
+    if (!byName.has(name)) {
+      db.prepare(`ALTER TABLE wrong_questions ADD COLUMN ${name} ${definition}`).run();
+    }
+  });
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_wrong_questions_question_id ON wrong_questions(question_id);
+    CREATE INDEX IF NOT EXISTS idx_wrong_questions_next_review_at ON wrong_questions(next_review_at);
+  `);
+
+  db.prepare(`
+    UPDATE wrong_questions
+    SET next_review_at = COALESCE(next_review_at, added_at, datetime('now')),
+        review_stage = COALESCE(review_stage, 0),
+        review_count = COALESCE(review_count, 0)
+    WHERE next_review_at IS NULL OR review_stage IS NULL OR review_count IS NULL
+  `).run();
 }
 
 // 初始化数据库
@@ -140,6 +198,8 @@ function initDatabase() {
       added_at TEXT DEFAULT CURRENT_TIMESTAMP,
       review_count INTEGER DEFAULT 0,
       last_review TEXT,
+      next_review_at TEXT,
+      review_stage INTEGER DEFAULT 0,
       FOREIGN KEY (question_id) REFERENCES questions(id)
     );
 
@@ -174,6 +234,7 @@ function initDatabase() {
   `);
 
   ensurePracticeRecordsSchema();
+  ensureWrongQuestionsSchema();
 
   // 插入示例数据（如果表为空）
   const count = db.prepare('SELECT COUNT(*) as count FROM papers').get();
@@ -310,25 +371,99 @@ function getPracticeRecords() {
 
 // 添加错题
 function addWrongQuestion(questionId, paperId, userAnswer, correctAnswer) {
-  const stmt = db.prepare(`
-    INSERT OR REPLACE INTO wrong_questions (id, question_id, paper_id, user_answer, correct_answer, added_at)
-    VALUES (?, ?, ?, ?, ?, datetime('now'))
-  `);
-  stmt.run(`wrong_${questionId}`, questionId, paperId, userAnswer, correctAnswer);
+  const now = toSQLiteDateTime();
+  db.prepare(`
+    INSERT INTO wrong_questions (
+      id, question_id, paper_id, user_answer, correct_answer,
+      added_at, next_review_at, review_stage
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+    ON CONFLICT(id) DO UPDATE SET
+      paper_id = excluded.paper_id,
+      user_answer = excluded.user_answer,
+      correct_answer = excluded.correct_answer,
+      added_at = excluded.added_at,
+      next_review_at = excluded.next_review_at,
+      review_stage = 0
+  `).run(`wrong_${questionId}`, questionId, String(paperId || ''), userAnswer, correctAnswer, now, now);
+}
+
+function hydrateWrongQuestionRow(row) {
+  if (!row) return null;
+
+  const nextReviewAt = row.next_review_at || row.added_at || null;
+  const nextReviewDate = parseSQLiteDateTime(nextReviewAt);
+  const now = new Date();
+
+  return {
+    ...row,
+    options: row.options ? JSON.parse(row.options) : [],
+    review_count: Number(row.review_count || 0),
+    review_stage: Number(row.review_stage || 0),
+    next_review_at: nextReviewAt,
+    is_due: nextReviewDate ? nextReviewDate.getTime() <= now.getTime() : true,
+  };
 }
 
 // 获取错题列表
-function getWrongQuestions() {
+function getWrongQuestionById(id) {
+  const row = db.prepare(`
+    SELECT wq.*, q.content, q.options, q.analysis, q.category, q.sub_category, q.answer, p.title AS paper_title
+    FROM wrong_questions wq
+    LEFT JOIN questions q ON wq.question_id = q.id
+    LEFT JOIN papers p ON wq.paper_id = p.id
+    WHERE wq.id = ?
+  `).get(id);
+
+  return hydrateWrongQuestionRow(row);
+}
+
+function getWrongQuestions(options = {}) {
+  const dueOnly = Boolean(options && options.dueOnly);
+  const limit = Number(options && options.limit);
+  const params = [];
+  const where = dueOnly ? `WHERE COALESCE(wq.next_review_at, wq.added_at, datetime('now')) <= datetime('now')` : '';
+  const limitSql = Number.isFinite(limit) && limit > 0 ? ' LIMIT ?' : '';
+  if (limitSql) params.push(Math.floor(limit));
+
   return db.prepare(`
     SELECT wq.*, q.content, q.options, q.analysis, q.category, q.sub_category, q.answer, p.title AS paper_title
     FROM wrong_questions wq
     LEFT JOIN questions q ON wq.question_id = q.id
     LEFT JOIN papers p ON wq.paper_id = p.id
-    ORDER BY wq.added_at DESC
-  `).all().map(row => ({
-    ...row,
-    options: row.options ? JSON.parse(row.options) : []
-  }));
+    ${where}
+    ORDER BY
+      CASE WHEN COALESCE(wq.next_review_at, wq.added_at, datetime('now')) <= datetime('now') THEN 0 ELSE 1 END ASC,
+      COALESCE(wq.next_review_at, wq.added_at, datetime('now')) ASC,
+      COALESCE(wq.review_stage, 0) ASC,
+      wq.added_at DESC
+    ${limitSql}
+  `).all(...params).map(hydrateWrongQuestionRow);
+}
+
+function reviewWrongQuestion(questionId, outcome = 'again') {
+  const id = `wrong_${String(questionId || '').trim()}`;
+  const row = db.prepare('SELECT * FROM wrong_questions WHERE id = ?').get(id);
+  if (!row) throw new Error('错题不存在');
+
+  const currentStage = Number(row.review_stage || 0);
+  const isRemembered = outcome === 'remembered';
+  const nextStage = isRemembered
+    ? Math.min(currentStage + 1, REVIEW_INTERVAL_DAYS.length - 1)
+    : 0;
+  const now = toSQLiteDateTime();
+  const nextReviewAt = getNextReviewAt(nextStage, new Date());
+
+  db.prepare(`
+    UPDATE wrong_questions
+    SET review_count = COALESCE(review_count, 0) + 1,
+        last_review = ?,
+        next_review_at = ?,
+        review_stage = ?
+    WHERE id = ?
+  `).run(now, nextReviewAt, nextStage, id);
+
+  return getWrongQuestionById(id);
 }
 
 // 获取分类统计
@@ -945,6 +1080,7 @@ module.exports = {
   getPracticeRecords,
   addWrongQuestion,
   getWrongQuestions,
+  reviewWrongQuestion,
   getCategoryStats,
   getSubCategoryStats,
   getPracticeStats,

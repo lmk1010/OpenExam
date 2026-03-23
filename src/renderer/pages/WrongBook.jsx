@@ -1,142 +1,105 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const CN = { yanyu: "言语理解", shuliang: "数量关系", panduan: "判断推理", ziliao: "资料分析", changshi: "常识判断" };
+const FILTERS = [{ key: "due", label: "待复习" }, { key: "all", label: "全部" }, { key: "learning", label: "熟悉中" }, { key: "mastered", label: "已掌握" }];
+const STAGES = [
+  { name: "新错题", color: "#ef4444", bg: "rgba(239,68,68,0.10)" },
+  { name: "1天复习", color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
+  { name: "2天复习", color: "#8b5cf6", bg: "rgba(139,92,246,0.12)" },
+  { name: "4天复习", color: "#6d5efb", bg: "rgba(109,94,251,0.12)" },
+  { name: "7天复习", color: "#2563eb", bg: "rgba(37,99,235,0.12)" },
+  { name: "15天巩固", color: "#0ea5e9", bg: "rgba(14,165,233,0.12)" },
+  { name: "30天掌握", color: "#10b981", bg: "rgba(16,185,129,0.12)" },
+];
+const parseTime = (value) => value ? new Date(String(value).replace(" ", "T") + "Z") : null;
+const formatTime = (value, due) => {
+  const date = parseTime(value); if (!date) return "立即复习";
+  const diff = Math.round((date.getTime() - Date.now()) / 3600000);
+  if (due || diff <= 0) return "现在可复习";
+  if (diff < 24) return `${diff} 小时后`;
+  const days = Math.round(diff / 24); return `${days} 天后`;
+};
+const formatShort = (value) => {
+  const date = parseTime(value); if (!date) return "刚刚";
+  const diff = Date.now() - date.getTime();
+  if (diff < 3600000) return `${Math.max(1, Math.floor(diff / 60000))} 分钟前`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`;
+  if (diff < 604800000) return `${Math.floor(diff / 86400000)} 天前`;
+  return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
+};
+const stageMeta = (stage = 0) => STAGES[Math.max(0, Math.min(stage, STAGES.length - 1))];
+const sortByUrgency = (a, b) => (Number(b.is_due) - Number(a.is_due)) || ((parseTime(a.next_review_at)?.getTime() || 0) - (parseTime(b.next_review_at)?.getTime() || 0)) || ((parseTime(b.added_at)?.getTime() || 0) - (parseTime(a.added_at)?.getTime() || 0));
 
 export default function WrongBook() {
-  const [list, setList] = useState([]);
-  const [filter, setFilter] = useState("all");
-  const [expandedId, setExpandedId] = useState(null);
+  const [list, setList] = useState([]), [loading, setLoading] = useState(true), [filter, setFilter] = useState("due"), [expandedId, setExpandedId] = useState(null), [busyId, setBusyId] = useState(""), [error, setError] = useState("");
+  const loadList = async () => {
+    if (!window.openexam?.db?.getWrongQuestions) return setLoading(false);
+    setLoading(true); setError("");
+    try { const rows = await window.openexam.db.getWrongQuestions(); setList((rows || []).sort(sortByUrgency)); }
+    catch (e) { setError(e.message || "错题读取失败"); }
+    setLoading(false);
+  };
+  useEffect(() => { loadList(); }, []);
 
-  useEffect(() => {
-    (async () => {
-      if (!window.openexam?.db) return;
-      try { 
-        setList(await window.openexam.db.getWrongQuestions()); 
-      } catch (e) { 
-        console.error(e); 
-      }
-    })();
-  }, []);
+  const stats = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10); const catCount = {};
+    list.forEach((item) => { catCount[item.category] = (catCount[item.category] || 0) + 1; });
+    const weakest = Object.entries(catCount).sort((a, b) => b[1] - a[1])[0];
+    return { due: list.filter((item) => item.is_due).length, today: list.filter((item) => String(item.added_at || "").startsWith(today)).length, mastered: list.filter((item) => (item.review_stage || 0) >= STAGES.length - 1 && !item.is_due).length, weakest: weakest ? CN[weakest[0]] || weakest[0] : "暂无" };
+  }, [list]);
 
-  const filtered = list.filter(q => filter === "all" || q.category === filter);
-  
-  // Calculate stats
-  const catCount = {};
-  list.forEach(q => { catCount[q.category] = (catCount[q.category] || 0) + 1; });
-  
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todayNew = list.filter(q => q.added_at && q.added_at.startsWith(todayStr)).length;
-  
-  let weakestCat = "暂无";
-  let maxWrong = 0;
-  Object.entries(catCount).forEach(([k, v]) => {
-    if (v > maxWrong) { maxWrong = v; weakestCat = CN[k] || k; }
-  });
+  const filtered = useMemo(() => list.filter((item) => filter === "all" || (filter === "due" && item.is_due) || (filter === "learning" && !item.is_due && (item.review_stage || 0) < STAGES.length - 1) || (filter === "mastered" && !item.is_due && (item.review_stage || 0) >= STAGES.length - 1)).sort(sortByUrgency), [list, filter]);
+  const focusDue = () => { setFilter("due"); const first = list.find((item) => item.is_due); if (first) setExpandedId(first.id); };
+  const updateReview = async (item, outcome) => {
+    if (!window.openexam?.db?.reviewWrongQuestion) return;
+    const key = `${item.id}:${outcome}`; setBusyId(key); setError("");
+    try {
+      const updated = await window.openexam.db.reviewWrongQuestion({ questionId: item.question_id, outcome });
+      setList((prev) => prev.map((row) => row.id === updated.id ? updated : row).sort(sortByUrgency)); setExpandedId(updated.id);
+    } catch (e) { setError(e.message || "复习状态更新失败"); }
+    setBusyId("");
+  };
 
-  return (
-    <section className="main-panel" style={{ padding: "0 24px 20px 24px", display: "flex", flexDirection: "column", gap: 0, overflow: "auto", minWidth: 0, height: "100%", boxSizing: "border-box" }}>
-      {/* High Density Header */}
-      <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", padding: "16px 0", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div className="breadcrumb" style={{ margin: 0, fontSize: 11, color: "var(--muted)" }}>我的 &gt; 错题本</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.5px", margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
-              错题本
-            </h2>
+  return <section className="main-panel" style={{ padding: "0 22px 22px", display: "flex", flexDirection: "column", gap: 16, overflow: "auto", height: "100%", boxSizing: "border-box" }}>
+    <header style={{ padding: "16px 0 0", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="breadcrumb" style={{ margin: 0 }}>我的 &gt; 错题本</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1.45fr 1fr", gap: 14 }}>
+        <div style={{ padding: 18, borderRadius: 22, background: "linear-gradient(135deg, rgba(109,94,251,0.96), rgba(78,70,214,0.92))", color: "#fff", boxShadow: "0 18px 40px rgba(109,94,251,0.18)" }}>
+          <div style={{ fontSize: 12, opacity: 0.78, marginBottom: 10 }}>今日复习台</div>
+          <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.8px" }}>{stats.due}<span style={{ fontSize: 14, fontWeight: 600, marginLeft: 6, opacity: 0.85 }}>道待复习</span></div>
+          <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.7, opacity: 0.92 }}>优先清掉到期错题，再把新错题推进到下一阶段，节奏会更稳。</div>
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <button onClick={focusDue} style={{ padding: "10px 16px", borderRadius: 12, border: "none", background: "#fff", color: "#5b52d6", fontWeight: 700, cursor: "pointer" }}>开始今日复习</button>
+            <button onClick={loadList} style={{ padding: "10px 16px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.28)", background: "rgba(255,255,255,0.08)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>刷新队列</button>
           </div>
         </div>
-        {/* Compact Stats */}
-        <div style={{ display: "flex", gap: 24, paddingRight: 4 }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>累计收录</span>
-            <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", fontFamily: "monospace" }}>{list.length} <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 400, fontFamily: "sans-serif" }}>道</span></span>
-          </div>
-          <div style={{ width: 1, height: 24, background: "var(--line)", alignSelf: "center" }} />
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>今日新增</span>
-            <span style={{ fontSize: 16, fontWeight: 600, color: "#EE5253", fontFamily: "monospace" }}>+{todayNew} <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 400, fontFamily: "sans-serif" }}>道</span></span>
-          </div>
-          <div style={{ width: 1, height: 24, background: "var(--line)", alignSelf: "center" }} />
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>亟待强化</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#f39c12", marginTop: 2 }}>{weakestCat}</span>
-          </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {[{ label: "今日新增", value: `+${stats.today}`, tone: "#ef4444" }, { label: "已掌握", value: stats.mastered, tone: "#10b981" }, { label: "累计错题", value: list.length, tone: "#6d5efb" }, { label: "薄弱板块", value: stats.weakest, tone: "#f59e0b" }].map((card) => <div key={card.label} style={{ padding: "14px 16px", borderRadius: 18, background: "var(--surface-soft)", border: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 8, justifyContent: "space-between" }}><span style={{ fontSize: 11, color: "var(--muted)" }}>{card.label}</span><span style={{ fontSize: typeof card.value === "number" ? 24 : 16, fontWeight: 800, color: card.tone, letterSpacing: "-0.4px" }}>{card.value}</span></div>)}
         </div>
-      </header>
+      </div>
+    </header>
 
-      {/* Minimalism Tabs */}
-      <div style={{ display: "flex", gap: 24, marginTop: 12, flexShrink: 0, paddingBottom: 8 }}>
-        <button onClick={() => setFilter("all")}
-          style={{ padding: "0 0 8px 0", fontSize: 13, cursor: "pointer", border: "none", background: "transparent", color: filter === "all" ? "var(--text)" : "var(--muted)", fontWeight: filter === "all" ? 600 : 400, position: "relative" }}>
-          全部错题
-          {filter === "all" && <span style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 2, borderRadius: 2, background: "var(--text)" }} />}
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{FILTERS.map((item) => <button key={item.key} onClick={() => setFilter(item.key)} style={{ padding: "8px 14px", borderRadius: 999, border: filter === item.key ? "1px solid rgba(109,94,251,0.22)" : "1px solid var(--line)", background: filter === item.key ? "rgba(109,94,251,0.10)" : "var(--surface)", color: filter === item.key ? "var(--accent)" : "var(--muted)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{item.label}</button>)}</div>
+      <div style={{ fontSize: 12, color: "var(--muted)" }}>按复习紧急度排序 · {filtered.length} 道</div>
+    </div>
+    {error && <div style={{ padding: "11px 14px", borderRadius: 14, border: "1px solid rgba(239,68,68,0.18)", background: "rgba(239,68,68,0.06)", color: "#b42318", fontSize: 12 }}>{error}</div>}
+    {loading ? <div style={{ padding: "80px 0", textAlign: "center", color: "var(--muted)" }}>错题加载中…</div> : filtered.length === 0 ? <div style={{ padding: "90px 0", textAlign: "center", color: "var(--muted)", border: "1px dashed var(--line)", borderRadius: 20 }}>当前筛选下暂无错题，状态很棒。</div> : <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>{filtered.map((item) => {
+      const meta = stageMeta(item.review_stage), open = expandedId === item.id, busyRemember = busyId === `${item.id}:remembered`, busyAgain = busyId === `${item.id}:again`;
+      return <article key={item.id} style={{ borderRadius: 20, border: item.is_due ? "1px solid rgba(109,94,251,0.22)" : "1px solid var(--line)", background: item.is_due ? "linear-gradient(180deg, rgba(109,94,251,0.05), var(--surface))" : "var(--surface)", boxShadow: item.is_due ? "0 14px 30px rgba(109,94,251,0.08)" : "none", overflow: "hidden" }}>
+        <button onClick={() => setExpandedId(open ? null : item.id)} style={{ width: "100%", padding: 0, border: "none", background: "transparent", textAlign: "left", cursor: "pointer" }}>
+          <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}><span style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(0,0,0,0.05)", color: "var(--text)", fontSize: 11, fontWeight: 700 }}>{CN[item.category] || item.category || "综合"}</span><span style={{ padding: "4px 10px", borderRadius: 999, background: meta.bg, color: meta.color, fontSize: 11, fontWeight: 700 }}>{meta.name}</span><span style={{ padding: "4px 10px", borderRadius: 999, background: item.is_due ? "rgba(109,94,251,0.12)" : "rgba(148,163,184,0.12)", color: item.is_due ? "var(--accent)" : "var(--muted)", fontSize: 11, fontWeight: 700 }}>{item.is_due ? "待处理" : formatTime(item.next_review_at, item.is_due)}</span><span style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)" }}>{item.paper_title || "未关联试卷"}</span></div>
+            <div style={{ fontSize: 14, lineHeight: 1.75, color: "var(--text)", fontWeight: 600 }}>{open || !item.content || item.content.length <= 110 ? item.content : `${item.content.slice(0, 110)}...`}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, fontSize: 12 }}><div><div style={{ color: "var(--muted)", marginBottom: 4 }}>你的答案</div><div style={{ color: "#ef4444", fontWeight: 700 }}>{item.user_answer || "未作答"}</div></div><div><div style={{ color: "var(--muted)", marginBottom: 4 }}>正确答案</div><div style={{ color: "#10b981", fontWeight: 700 }}>{item.correct_answer || item.answer || "-"}</div></div><div><div style={{ color: "var(--muted)", marginBottom: 4 }}>复习次数</div><div style={{ color: "var(--text)", fontWeight: 700 }}>{item.review_count || 0} 次</div></div><div><div style={{ color: "var(--muted)", marginBottom: 4 }}>加入时间</div><div style={{ color: "var(--text)", fontWeight: 700 }}>{formatShort(item.added_at)}</div></div></div>
+          </div>
         </button>
-        {Object.entries(catCount).map(([k, v]) => (
-          <button key={k} onClick={() => setFilter(k)}
-            style={{ padding: "0 0 8px 0", fontSize: 13, cursor: "pointer", border: "none", background: "transparent", color: filter === k ? "var(--text)" : "var(--muted)", fontWeight: filter === k ? 600 : 400, position: "relative" }}>
-            {CN[k] || k} <span style={{ fontSize: 11, opacity: 0.7, marginLeft: 2 }}>{v}</span>
-            {filter === k && <span style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 2, borderRadius: 2, background: "var(--text)" }} />}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, marginTop: 4 }}>
-        {filtered.length === 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, color: "var(--muted)", minHeight: 200 }}>
-            <span style={{ fontSize: 12, border: "1px dashed var(--line)", padding: "12px 24px", borderRadius: 6 }}>无该学科错题记录</span>
-          </div>
-        ) : (
-          <div style={{ overflowY: "auto", flex: 1, paddingRight: 8 }}>
-            {filtered.map((q, index) => (
-              <div key={q.id} onClick={() => setExpandedId(expandedId === q.id ? null : q.id)}
-                style={{ 
-                  borderBottom: "1px solid var(--line)", 
-                  padding: "16px 0", 
-                  cursor: "pointer",
-                  display: "flex", flexDirection: "column", gap: 8
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                  <span style={{ fontSize: 12, color: "var(--muted)", width: 68, flexShrink: 0, paddingTop: 1, fontWeight: 500 }}>
-                    [{CN[q.category] || q.category}]
-                  </span>
-                  
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--text)", overflowWrap: "break-word" }}>
-                      {q.content?.length > 120 && expandedId !== q.id ? q.content.slice(0, 120) + "..." : q.content}
-                    </div>
-                  </div>
-                  
-                  <span style={{ fontSize: 11, color: "var(--muted)", width: 44, textAlign: "right" }}>
-                    {q.added_at?.slice(5, 10).replace('-', '/')}
-                  </span>
-                </div>
-                
-                {/* Compact Answer & Status Row */}
-                <div style={{ display: "flex", alignItems: "center", gap: 24, marginLeft: 80, fontSize: 12, color: "var(--muted)" }}>
-                  <span>错答: <strong style={{ color: "#EE5253", fontWeight: 600 }}>{q.user_answer}</strong></span>
-                  <span>正答: <strong style={{ color: "#27ae60", fontWeight: 600 }}>{q.correct_answer}</strong></span>
-                  
-                  {q.analysis && (
-                    <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--accent)", display: "flex", alignItems: "center", gap: 2 }}>
-                      {expandedId === q.id ? "收起解析" : "查看解析"}
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: expandedId === q.id ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
-                    </span>
-                  )}
-                </div>
-                
-                {expandedId === q.id && q.analysis && (
-                  <div style={{ marginLeft: 80, marginTop: 4, padding: "10px 14px", borderRadius: 6, background: "rgba(0,0,0,0.02)", fontSize: 12, color: "var(--text)", lineHeight: 1.6 }}>
-                    <strong style={{ color: "var(--muted)", marginRight: 8 }}>分析</strong>
-                    {q.analysis}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </section>
-  );
+        {open && <div style={{ borderTop: "1px solid var(--line)", padding: "0 18px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+          {Array.isArray(item.options) && item.options.length > 0 && <div style={{ display: "grid", gap: 8, marginTop: 16 }}>{item.options.map((opt) => <div key={opt.key} style={{ padding: "11px 12px", borderRadius: 12, border: `1px solid ${opt.key === (item.answer || item.correct_answer) ? "rgba(16,185,129,0.28)" : opt.key === item.user_answer ? "rgba(239,68,68,0.22)" : "var(--line)"}`, background: opt.key === (item.answer || item.correct_answer) ? "rgba(16,185,129,0.07)" : opt.key === item.user_answer ? "rgba(239,68,68,0.05)" : "var(--surface-soft)", fontSize: 12, lineHeight: 1.6, color: "var(--text)" }}><strong style={{ marginRight: 8 }}>{opt.key}.</strong>{opt.content}</div>)}</div>}
+          {item.analysis && <div style={{ padding: "14px 15px", borderRadius: 14, background: "var(--surface-soft)", border: "1px solid var(--line)", fontSize: 12, lineHeight: 1.8, color: "var(--text)" }}><div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", marginBottom: 6 }}>解析</div>{item.analysis}</div>}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}><div style={{ fontSize: 12, color: "var(--muted)" }}>上次复习 {item.last_review ? formatShort(item.last_review) : "尚未开始"} · 下次 {formatTime(item.next_review_at, item.is_due)}</div><div style={{ display: "flex", gap: 10 }}><button onClick={() => updateReview(item, "again")} disabled={busyAgain || !!busyId} style={{ padding: "10px 14px", borderRadius: 12, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.06)", color: "#ef4444", fontWeight: 700, cursor: busyId ? "wait" : "pointer" }}>{busyAgain ? "处理中..." : "继续复习"}</button><button onClick={() => updateReview(item, "remembered")} disabled={busyRemember || !!busyId} style={{ padding: "10px 14px", borderRadius: 12, border: "none", background: "var(--accent)", color: "#fff", fontWeight: 700, cursor: busyId ? "wait" : "pointer", boxShadow: "0 10px 20px rgba(109,94,251,0.20)" }}>{busyRemember ? "处理中..." : "记住了，推进阶段"}</button></div></div>
+        </div>}
+      </article>;
+    })}</div>}
+  </section>;
 }

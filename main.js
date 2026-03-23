@@ -89,8 +89,12 @@ ipcMain.handle("db:addWrongQuestion", (event, { questionId, paperId, userAnswer,
   return true;
 });
 
-ipcMain.handle("db:getWrongQuestions", () => {
-  return database.getWrongQuestions();
+ipcMain.handle("db:getWrongQuestions", (event, options) => {
+  return database.getWrongQuestions(options || {});
+});
+
+ipcMain.handle("db:reviewWrongQuestion", (event, input) => {
+  return database.reviewWrongQuestion(input?.questionId, input?.outcome);
 });
 
 ipcMain.handle("db:getCategoryStats", () => {

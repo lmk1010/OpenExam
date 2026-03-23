@@ -46,6 +46,13 @@ npm run dist:win
 - 推送标签 `v*` 会自动触发 GitHub Actions
 - 自动构建 `macOS` 和 `Windows` 安装包
 - 自动把产物上传到 GitHub Release
+- Release 页面会自动附带安装说明
+
+### macOS 首次打开说明
+
+- 当前自动构建的 `macOS` 安装包未做 Apple notarization
+- 如果系统拦截，可在 Finder 里右键 `OpenExam.app` → `打开`
+- 仍被拦截时可执行：`xattr -dr com.apple.quarantine /Applications/OpenExam.app`
 
 ```bash
 git tag v0.1.1

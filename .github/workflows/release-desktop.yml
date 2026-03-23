@@ -79,4 +79,22 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: release-artifacts/**
+          body: |
+            ## 下载与安装
+
+            ### macOS
+            - 下载 `OpenExam-*.dmg`，拖到“应用程序”即可。
+            - 当前自动构建包未做 Apple notarization，首次打开如果被系统拦截：
+              - 方法 1：在 Finder 中右键 `OpenExam.app` → `打开`
+              - 方法 2：终端执行 `xattr -dr com.apple.quarantine /Applications/OpenExam.app`
+            - 处理后重新打开应用即可。
+
+            ### Windows
+            - 下载 `OpenExam-*.exe`，双击安装即可。
+            - 若 Defender 提示，请选择“更多信息”后继续安装。
+
+            ## 说明
+            - 用户数据默认保存在本地。
+            - 本 Release 由 GitHub Actions 自动构建。
           generate_release_notes: true
+          append_body: true

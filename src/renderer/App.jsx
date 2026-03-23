@@ -15,6 +15,7 @@ import AchievementCenter from "./pages/AchievementCenter.jsx";
 import OnboardingTour from "./components/OnboardingTour.jsx";
 import { actions, getState } from "./store/examStore.js";
 import { normalizeAISettings } from "./store/aiSettings.js";
+import appLogo from "./assets/openexam-logo.png";
 
 const DynamicChart = ({ data, onHover }) => {
   const containerRef = React.useRef(null);
@@ -462,13 +463,22 @@ export default function App() {
 
         <section className="workspace">
           <header className="workspace-header">
-            <nav className="tabs">
-              {["学习中心", "题库练习", "模拟考试", "AI出卷", "我的成长"].map(tab => (
-                <button key={tab} className={`tab ${activeTab === tab ? "active" : ""}`} onClick={() => handleTabChange(tab)}>
-                  {tab}
-                </button>
-              ))}
-            </nav>
+            <div className="workspace-header-main">
+              <button className="app-brand" type="button" onClick={() => { setActiveTab('学习中心'); setPage('home'); }}>
+                <img src={appLogo} alt="OpenExam" className="app-brand-logo" />
+                <div className="app-brand-copy">
+                  <strong>OpenExam</strong>
+                  <span>AI 备考空间</span>
+                </div>
+              </button>
+              <nav className="tabs">
+                {["学习中心", "题库练习", "模拟考试", "AI出卷", "我的成长"].map(tab => (
+                  <button key={tab} className={`tab ${activeTab === tab ? "active" : ""}`} onClick={() => handleTabChange(tab)}>
+                    {tab}
+                  </button>
+                ))}
+              </nav>
+            </div>
             <div className="header-actions">
               <button className="search">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -487,7 +497,7 @@ export default function App() {
                     <span className="user-name">考生用户</span>
                     <div className="avatar-wrap">
                       <div className="avatar">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="avatar-icon">
                           <path d="M20 21a8 8 0 0 0-16 0"/>
                           <circle cx="12" cy="8" r="4"/>
                         </svg>

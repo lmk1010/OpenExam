@@ -10,12 +10,12 @@ const CAT_NAMES = {
   changshi: '常识判断',
 };
 const CAT_COLORS = {
-  yanyu:    { color: '#6d5efb', bg: 'rgba(109,94,251,0.10)' },
-  shuliang: { color: '#1e78ff', bg: 'rgba(30,120,255,0.10)' },
-  panduan:  { color: '#00b894', bg: 'rgba(0,184,148,0.10)' },
-  ziliao:   { color: '#f39c12', bg: 'rgba(243,156,18,0.10)' },
-  changshi: { color: '#e74c3c', bg: 'rgba(231,76,60,0.10)' },
-  default:  { color: '#6d5efb', bg: 'rgba(109,94,251,0.10)' },
+  yanyu:    { color: 'var(--accent)', bg: 'var(--accent-soft-bg)', soft: 'var(--accent-soft-bg-strong)', border: 'var(--accent-border-soft)' },
+  shuliang: { color: 'var(--info)', bg: 'var(--info-soft)', soft: 'var(--info-soft)', border: 'var(--info-border)' },
+  panduan:  { color: 'var(--success)', bg: 'var(--success-soft)', soft: 'var(--success-soft)', border: 'var(--success-border)' },
+  ziliao:   { color: 'var(--warning)', bg: 'var(--warning-soft)', soft: 'var(--warning-soft)', border: 'var(--warning-border)' },
+  changshi: { color: 'var(--danger)', bg: 'var(--danger-soft)', soft: 'var(--danger-soft)', border: 'var(--danger-border)' },
+  default:  { color: 'var(--accent)', bg: 'var(--accent-soft-bg)', soft: 'var(--accent-soft-bg-strong)', border: 'var(--accent-border-soft)' },
 };
 
 // ─── Svg icons ────────────────────────────────────────────────────────────────
@@ -32,7 +32,7 @@ function ConfirmModal({ show, title, message, onConfirm, onCancel }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center' }} onClick={onCancel}>
       <div style={{ background: 'var(--surface)', width: 340, borderRadius: 18, padding: '28px 24px', boxShadow: '0 24px 48px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 14 }} onClick={e => e.stopPropagation()}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(109,94,251,0.1)', color: 'var(--accent)', display: 'grid', placeItems: 'center' }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--accent-soft-bg)', color: 'var(--accent)', display: 'grid', placeItems: 'center' }}>
           <Ico d={<><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>} size={22} sw={2} col="var(--accent)" />
         </div>
         <div>
@@ -41,7 +41,7 @@ function ConfirmModal({ show, title, message, onConfirm, onCancel }) {
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
           <button style={{ flex: 1, padding: '9px 0', borderRadius: 8, background: 'var(--surface-soft)', color: 'var(--text)', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer' }} onClick={onCancel}>取消</button>
-          <button style={{ flex: 1, padding: '9px 0', borderRadius: 8, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(109,94,251,0.28)' }} onClick={onConfirm}>确定</button>
+          <button style={{ flex: 1, padding: '9px 0', borderRadius: 8, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: '0 10px 20px rgba(15,23,42,0.1)' }} onClick={onConfirm}>确定</button>
         </div>
       </div>
     </div>
@@ -179,16 +179,16 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
 
         let border = '1px solid var(--line)', bg = 'var(--surface)', tagBg = 'var(--surface-soft)', tagCol = 'var(--muted)';
         if (showResult) {
-          if (isCorrect)       { border = '1.5px solid #00b894'; bg = 'rgba(0,184,148,0.05)'; tagBg = '#00b894'; tagCol = '#fff'; }
-          else if (isSelected) { border = '1.5px solid #e74c3c'; bg = 'rgba(231,76,60,0.04)'; tagBg = '#e74c3c'; tagCol = '#fff'; }
-        } else if (isSelected)   { border = `1.5px solid var(--accent)`; bg = 'rgba(109,94,251,0.05)'; tagBg = 'var(--accent)'; tagCol = '#fff'; }
+          if (isCorrect)       { border = '1.5px solid var(--success)'; bg = 'var(--success-soft)'; tagBg = 'var(--success)'; tagCol = '#fff'; }
+          else if (isSelected) { border = '1.5px solid var(--danger)'; bg = 'var(--danger-soft)'; tagBg = 'var(--danger)'; tagCol = '#fff'; }
+        } else if (isSelected)   { border = '1.5px solid var(--accent)'; bg = 'var(--accent-soft-bg)'; tagBg = 'var(--accent)'; tagCol = '#fff'; }
 
         return (
           <button key={opt.key} onClick={() => handleSelect(opt.key)} style={{
             display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 14px',
             borderRadius: 10, border, background: bg,
             textAlign: 'left', cursor: showResult ? 'default' : 'pointer', transition: 'all 0.18s',
-            boxShadow: isSelected && !showResult ? '0 2px 8px rgba(109,94,251,0.08)' : 'none',
+            boxShadow: isSelected && !showResult ? '0 8px 18px rgba(15,23,42,0.08)' : 'none',
           }}
             onMouseOver={e => { if (!showResult && !isSelected) e.currentTarget.style.borderColor = 'var(--accent)'; }}
             onMouseOut={e => { if (!showResult && !isSelected) e.currentTarget.style.borderColor = 'var(--line)'; }}>
@@ -207,13 +207,13 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
     if (!isMemorizeMode && !(answers[currentQuestion.id] && showAnalysis)) return null;
     const isRight = answers[currentQuestion.id] === currentQuestion.answer;
     return (
-      <div style={{ marginTop: 20, padding: '16px 18px', background: 'rgba(109,94,251,0.03)', borderRadius: 10, border: '1px solid rgba(109,94,251,0.12)', animation: 'fadeIn 0.25s ease-out' }}>
+      <div style={{ marginTop: 20, padding: '16px 18px', background: 'var(--accent-soft-bg)', borderRadius: 10, border: '1px solid var(--accent-border-soft)', animation: 'fadeIn 0.25s ease-out' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
           {answers[currentQuestion.id] ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 5, color: isRight ? '#00b894' : '#e74c3c', background: isRight ? 'rgba(0,184,148,0.1)' : 'rgba(231,76,60,0.1)' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 5, color: isRight ? 'var(--success)' : 'var(--danger)', background: isRight ? 'var(--success-soft)' : 'var(--danger-soft)' }}>
               {isRight
-                ? <><Ico d={<polyline points="20 6 9 17 4 12"/>} size={12} sw={2.5} col="#00b894"/>回答正确</>
-                : <><Ico d={<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>} size={12} sw={2.5} col="#e74c3c"/>回答错误</>
+                ? <><Ico d={<polyline points="20 6 9 17 4 12"/>} size={12} sw={2.5} col="var(--success)"/>回答正确</>
+                : <><Ico d={<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>} size={12} sw={2.5} col="var(--danger)"/>回答错误</>
               }
             </span>
           ) : null}
@@ -263,13 +263,13 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
           </div>
 
           {/* Timer */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', background: 'rgba(109,94,251,0.06)', borderRadius: 16, color: 'var(--accent)', fontSize: 13, fontWeight: 700, fontFamily: 'monospace' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', background: 'var(--accent-soft-bg)', borderRadius: 16, color: 'var(--accent)', fontSize: 13, fontWeight: 700, fontFamily: 'monospace' }}>
             <Ico d={<><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></>} size={13} sw={2} col="var(--accent)" />
             {formatTime(timeElapsed)}
           </div>
 
           {/* Submit */}
-          <button onClick={handleSubmit} style={{ padding: '7px 20px', borderRadius: 16, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: '0 3px 10px rgba(109,94,251,0.28)', transition: 'transform 0.1s' }}
+          <button onClick={handleSubmit} style={{ padding: '7px 20px', borderRadius: 16, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: '0 10px 20px rgba(15,23,42,0.1)', transition: 'transform 0.1s' }}
             onPointerDown={e => e.currentTarget.style.transform = 'scale(0.96)'}
             onPointerUp={e => e.currentTarget.style.transform = ''}>
             交卷
@@ -292,7 +292,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
               </span>
             </div>
             {/* Progress bar */}
-            <div style={{ width: '100%', height: 4, background: 'rgba(109,94,251,0.1)', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: 4, background: 'var(--accent-soft-bg)', borderRadius: 4, overflow: 'hidden' }}>
               <div style={{ width: `${progressPercent}%`, height: '100%', background: 'var(--accent)', borderRadius: 4, transition: 'width 0.4s ease' }} />
             </div>
             <div style={{ marginTop: 7, fontSize: 10, color: 'var(--muted)' }}>
@@ -349,9 +349,9 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
                               cursor: 'pointer', transition: 'all 0.15s',
                               ...(isCurrent ? {
                                 border: `2px solid ${pal.color}`, background: pal.color, color: '#fff',
-                                boxShadow: `0 2px 8px ${pal.color}40`,
+                                boxShadow: '0 8px 18px rgba(15,23,42,0.1)',
                               } : isAnswered ? {
-                                border: `1px solid ${pal.color}60`, background: pal.bg, color: pal.color,
+                                border: `1px solid ${pal.border}`, background: pal.bg, color: pal.color,
                               } : {
                                 border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--muted)',
                               }),
@@ -371,8 +371,8 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
           <div style={{ padding: '10px 16px', borderTop: '1px solid var(--line)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {[
               { label: '未答', border: '1px solid var(--line)', bg: 'var(--surface)' },
-              { label: '已答', border: '1px solid rgba(109,94,251,0.5)', bg: 'rgba(109,94,251,0.08)' },
-              { label: '当前', border: '2px solid #6d5efb', bg: '#6d5efb' },
+              { label: '已答', border: '1px solid var(--accent-border-soft)', bg: 'var(--accent-soft-bg)' },
+              { label: '当前', border: '2px solid var(--accent)', bg: 'var(--accent)' },
             ].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ width: 9, height: 9, borderRadius: 2, border: l.border, background: l.bg, flexShrink: 0 }} />
@@ -407,11 +407,11 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
                   <span style={{ fontSize: 22, fontWeight: 800, color: catPalette.color, fontFamily: 'monospace', lineHeight: 1 }}>{currentIndex + 1}</span>
                   <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500, fontFamily: 'monospace' }}>/{questions.length}</span>
                 </div>
-                <div style={{ width: 1, height: 14, background: `${catPalette.color}40` }} />
-                <span style={{ fontSize: 11, fontWeight: 600, color: catPalette.color, padding: '2px 8px', borderRadius: 5, background: `${catPalette.color}18` }}>
+                <div style={{ width: 1, height: 14, background: catPalette.border }} />
+                <span style={{ fontSize: 11, fontWeight: 600, color: catPalette.color, padding: '2px 8px', borderRadius: 5, background: catPalette.soft }}>
                   {currentQuestion.category ? (CAT_NAMES[currentQuestion.category] || currentQuestion.category) : '综合'}
                 </span>
-                <span style={{ fontSize: 10, color: 'var(--muted)', padding: '2px 7px', borderRadius: 5, background: 'rgba(0,0,0,0.04)' }}>
+                <span style={{ fontSize: 10, color: 'var(--muted)', padding: '2px 7px', borderRadius: 5, background: 'var(--neutral-soft-bg)' }}>
                   {currentQuestion.type === 'single' ? '单选题' : '多选题'}
                 </span>
                 {/* Difficulty dots if available */}
@@ -419,7 +419,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: 3, alignItems: 'center' }}>
                     <span style={{ fontSize: 10, color: 'var(--muted)' }}>难度</span>
                     {[1,2,3,4,5].map(d => (
-                      <span key={d} style={{ width: 5, height: 5, borderRadius: '50%', background: d <= (currentQuestion.difficulty || 3) ? catPalette.color : 'rgba(0,0,0,0.08)' }} />
+                      <span key={d} style={{ width: 5, height: 5, borderRadius: '50%', background: d <= (currentQuestion.difficulty || 3) ? catPalette.color : 'var(--neutral-soft-bg)' }} />
                     ))}
                   </div>
                 )}
@@ -477,7 +477,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
                     pointerEvents: 'auto',
                     width: isCur ? 28 : 22, height: 22, borderRadius: 11,
                     border: isCur ? '2px solid var(--accent)' : '1px solid var(--line)',
-                    background: isCur ? 'var(--accent)' : answers[q.id] ? 'rgba(109,94,251,0.1)' : 'var(--surface)',
+                    background: isCur ? 'var(--accent)' : answers[q.id] ? 'var(--accent-soft-bg)' : 'var(--surface)',
                     color: isCur ? '#fff' : 'var(--muted)',
                     fontSize: 10, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
                   }}>

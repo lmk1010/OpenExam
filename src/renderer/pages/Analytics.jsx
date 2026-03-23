@@ -9,13 +9,16 @@ const CN = {
   changshi: "常识判断",
 };
 
-const SPECTRUM = [
-  { color: "#6d5efb", bg: "rgba(109,94,251,0.10)", light: "rgba(109,94,251,0.06)" },
-  { color: "#1e78ff", bg: "rgba(30,120,255,0.10)",  light: "rgba(30,120,255,0.06)" },
-  { color: "#00b894", bg: "rgba(0,184,148,0.10)",   light: "rgba(0,184,148,0.06)" },
-  { color: "#f39c12", bg: "rgba(243,156,18,0.10)",  light: "rgba(243,156,18,0.06)" },
-  { color: "#e74c3c", bg: "rgba(231,76,60,0.10)",   light: "rgba(231,76,60,0.06)" },
-];
+const PALETTES = {
+  accent: { color: "var(--accent)", bg: "var(--accent-soft-bg)", soft: "var(--accent-soft-bg-strong)", border: "var(--accent-border-soft)" },
+  info: { color: "var(--info)", bg: "var(--info-soft)", soft: "var(--info-soft)", border: "var(--info-border)" },
+  success: { color: "var(--success)", bg: "var(--success-soft)", soft: "var(--success-soft)", border: "var(--success-border)" },
+  warning: { color: "var(--warning)", bg: "var(--warning-soft)", soft: "var(--warning-soft)", border: "var(--warning-border)" },
+  danger: { color: "var(--danger)", bg: "var(--danger-soft)", soft: "var(--danger-soft)", border: "var(--danger-border)" },
+  neutral: { color: "var(--muted)", bg: "var(--neutral-soft-bg)", soft: "var(--neutral-soft-bg)", border: "var(--line)" },
+};
+
+const SPECTRUM = [PALETTES.accent, PALETTES.info, PALETTES.success, PALETTES.warning, PALETTES.danger];
 
 // ─── Mini SVG icons ──────────────────────────────────────────────────────────
 const Icon = ({ path, size = 14, color = "currentColor", sw = 1.8, extra }) => (
@@ -41,7 +44,7 @@ const ICONS = {
 
 // ─── Compact category progress bar ───────────────────────────────────────────
 function CategoryRow({ name, pct, done, total, color, bg, rank }) {
-  const rankColors = ["#f39c12","#95a5a6","#cd7f32"];
+  const rankColors = ["var(--warning)","#8f99ad","#b58b63"];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
       {/* rank badge */}
@@ -58,10 +61,10 @@ function CategoryRow({ name, pct, done, total, color, bg, rank }) {
       </span>
 
       {/* bar */}
-      <div style={{ flex: 1, height: 5, background: "rgba(0,0,0,0.05)", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ flex: 1, height: 5, background: "var(--neutral-soft-bg)", borderRadius: 10, overflow: "hidden" }}>
         <div style={{
           width: `${pct}%`, height: "100%",
-          background: `linear-gradient(90deg, ${color} 0%, ${color}cc 100%)`,
+          background: color,
           borderRadius: 10, transition: "width 0.8s cubic-bezier(0.4,0,0.2,1)"
         }}/>
       </div>
@@ -76,21 +79,21 @@ function CategoryRow({ name, pct, done, total, color, bg, rank }) {
 }
 
 // ─── Stat card ───────────────────────────────────────────────────────────────
-function StatCard({ label, value, unit, icon, color, bg, note }) {
+function StatCard({ label, value, unit, icon, color, bg, border, iconBg, note }) {
   return (
     <div style={{
       display: "flex", flexDirection: "column", gap: 10,
       background: bg, borderRadius: 12, padding: "14px 16px",
-      border: `1px solid ${color}22`,
+      border: `1px solid ${border || 'var(--line)'}`,
       transition: "transform 0.15s ease, box-shadow 0.15s ease",
     }}
-      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = `0 4px 16px ${color}18`; }}
+      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 10px 22px rgba(15,23,42,0.06)"; }}
       onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>{label}</span>
         <div style={{
-          width: 26, height: 26, borderRadius: 7, background: `${color}18`,
+          width: 26, height: 26, borderRadius: 7, background: iconBg || bg,
           display: "grid", placeItems: "center", color,
         }}>
           <Icon path={icon} size={13} color={color} sw={2} />
@@ -106,7 +109,7 @@ function StatCard({ label, value, unit, icon, color, bg, note }) {
 }
 
 // ─── Donut mini chart ────────────────────────────────────────────────────────
-function DonutRing({ pct, size = 72, stroke = 7, color = "#6d5efb", label }) {
+function DonutRing({ pct, size = 72, stroke = 7, color = "var(--accent)", track = "var(--neutral-soft-bg)", label }) {
   const R = (size - stroke) / 2;
   const circ = 2 * Math.PI * R;
   const dash = circ * (pct / 100);
@@ -114,7 +117,7 @@ function DonutRing({ pct, size = 72, stroke = 7, color = "#6d5efb", label }) {
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
       <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
         <circle cx={size/2} cy={size/2} r={R} fill="none"
-          stroke={`${color}20`} strokeWidth={stroke}/>
+          stroke={track} strokeWidth={stroke}/>
         <circle cx={size/2} cy={size/2} r={R} fill="none"
           stroke={color} strokeWidth={stroke} strokeLinecap="round"
           strokeDasharray={`${dash} ${circ}`}
@@ -126,7 +129,7 @@ function DonutRing({ pct, size = 72, stroke = 7, color = "#6d5efb", label }) {
 }
 
 // ─── Section header ───────────────────────────────────────────────────────────
-function SectionHead({ icon, title, iconColor = "var(--accent)", action }) {
+function SectionHead({ icon, title, iconColor = "var(--accent)", iconBg = "var(--accent-soft-bg)", action }) {
   return (
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -134,7 +137,7 @@ function SectionHead({ icon, title, iconColor = "var(--accent)", action }) {
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
         <div style={{
-          width: 22, height: 22, borderRadius: 6, background: `${iconColor}14`,
+          width: 22, height: 22, borderRadius: 6, background: iconBg,
           display: "grid", placeItems: "center", color: iconColor, flexShrink: 0,
         }}>
           <Icon path={icon} size={12} color={iconColor} sw={2} />
@@ -153,21 +156,21 @@ function StackedBar({ correct, wrong, total }) {
   return (
     <div>
       <div style={{ display: "flex", height: 8, borderRadius: 8, overflow: "hidden", gap: 2 }}>
-        <div style={{ width: `${pctC}%`, background: "#00b894", borderRadius: "8px 0 0 8px", transition: "width 0.8s ease" }}/>
-        <div style={{ width: `${pctW}%`, background: "#e74c3c", borderRadius: "0 8px 8px 0", transition: "width 0.8s ease" }}/>
-        <div style={{ flex: 1, background: "rgba(0,0,0,0.06)" }}/>
+        <div style={{ width: `${pctC}%`, background: "var(--success)", borderRadius: "8px 0 0 8px", transition: "width 0.8s ease" }}/>
+        <div style={{ width: `${pctW}%`, background: "var(--danger)", borderRadius: "0 8px 8px 0", transition: "width 0.8s ease" }}/>
+        <div style={{ flex: 1, background: "var(--neutral-soft-bg)" }}/>
       </div>
       <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <span style={{ width: 7, height: 7, borderRadius: 2, background: "#00b894", flexShrink: 0 }}/>
+          <span style={{ width: 7, height: 7, borderRadius: 2, background: "var(--success)", flexShrink: 0 }}/>
           <span style={{ fontSize: 11, color: "var(--muted)" }}>正确 <b style={{ color: "var(--text)" }}>{correct}</b></span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <span style={{ width: 7, height: 7, borderRadius: 2, background: "#e74c3c", flexShrink: 0 }}/>
+          <span style={{ width: 7, height: 7, borderRadius: 2, background: "var(--danger)", flexShrink: 0 }}/>
           <span style={{ fontSize: 11, color: "var(--muted)" }}>错误 <b style={{ color: "var(--text)" }}>{wrong}</b></span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <span style={{ width: 7, height: 7, borderRadius: 2, background: "rgba(0,0,0,0.08)", flexShrink: 0 }}/>
+          <span style={{ width: 7, height: 7, borderRadius: 2, background: "var(--neutral-soft-bg)", flexShrink: 0 }}/>
           <span style={{ fontSize: 11, color: "var(--muted)" }}>未做 <b style={{ color: "var(--text)" }}>{Math.max(0, total - correct - wrong)}</b></span>
         </div>
       </div>
@@ -216,10 +219,10 @@ export default function Analytics({ onOpenSettings }) {
 
   /* ──── Card data arrays ──── */
   const summaryCards = [
-    { label: "题库总量",   value: totalPossible.toLocaleString(), unit: "道", icon: ICONS.book,  color: "#6d5efb", bg: "rgba(109,94,251,0.06)" },
-    { label: "已练习量",   value: totalDone.toLocaleString(),     unit: "道", icon: ICONS.flash, color: "#1e78ff", bg: "rgba(30,120,255,0.06)", note: `完成度 ${completionRate}%` },
-    { label: "综合正确率", value: `${stats.accuracy}`,            unit: "%",  icon: ICONS.check, color: "#00b894", bg: "rgba(0,184,148,0.06)", note: `正确 ${stats.correctCount} 道` },
-    { label: "待攻克题目", value: stats.wrongCount.toLocaleString(), unit: "道", icon: ICONS.cross, color: "#e74c3c", bg: "rgba(231,76,60,0.06)", note: "错误 / 跳过" },
+    { label: "题库总量",   value: totalPossible.toLocaleString(), unit: "道", icon: ICONS.book,  ...PALETTES.accent },
+    { label: "已练习量",   value: totalDone.toLocaleString(),     unit: "道", icon: ICONS.flash, note: `完成度 ${completionRate}%`, ...PALETTES.info },
+    { label: "综合正确率", value: `${stats.accuracy}`,            unit: "%",  icon: ICONS.check, note: `正确 ${stats.correctCount} 道`, ...PALETTES.success },
+    { label: "待攻克题目", value: stats.wrongCount.toLocaleString(), unit: "道", icon: ICONS.cross, note: "错误 / 跳过", ...PALETTES.danger },
   ];
   const aiReady = isAIConfigured() && Boolean(window.openexam?.ai);
 
@@ -278,9 +281,9 @@ export default function Analytics({ onOpenSettings }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{
               width: 28, height: 28, borderRadius: 8,
-              background: "linear-gradient(135deg, #6d5efb 0%, #3b28cc 100%)",
+              background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%)",
               display: "grid", placeItems: "center", color: "#fff",
-              boxShadow: "0 4px 10px rgba(109,94,251,0.22)",
+              boxShadow: "0 8px 18px rgba(15,23,42,0.08)",
             }}>
               <Icon path={ICONS.bar} size={14} color="#fff" sw={2} />
             </div>
@@ -291,13 +294,13 @@ export default function Analytics({ onOpenSettings }) {
         {/* Header stats pills */}
         <div style={{ display: "flex", gap: 8 }}>
           {[
-            { label: "总进度", val: `${completionRate}%`, color: "#6d5efb", bg: "rgba(109,94,251,0.08)" },
-            { label: "正确率", val: `${stats.accuracy}%`, color: "#00b894", bg: "rgba(0,184,148,0.08)" },
+            { label: "总进度", val: `${completionRate}%`, color: "var(--accent)", bg: "var(--accent-soft-bg)", border: "var(--accent-border-soft)" },
+            { label: "正确率", val: `${stats.accuracy}%`, color: "var(--success)", bg: "var(--success-soft)", border: "var(--success-border)" },
           ].map(p => (
             <div key={p.label} style={{
               display: "flex", alignItems: "center", gap: 6,
               background: p.bg, borderRadius: 20, padding: "5px 12px",
-              border: `1px solid ${p.color}22`,
+              border: `1px solid ${p.border || 'var(--line)'}`,
             }}>
               <span style={{ fontSize: 11, color: "var(--muted)" }}>{p.label}</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: p.color, fontFamily: "monospace" }}>{p.val}</span>
@@ -321,7 +324,7 @@ export default function Analytics({ onOpenSettings }) {
 
           {/* LEFT: category mastery */}
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <SectionHead icon={ICONS.target} title="知识板块掌握度" iconColor="#6d5efb" />
+            <SectionHead icon={ICONS.target} title="知识板块掌握度" iconColor="var(--accent)" iconBg="var(--accent-soft-bg)" />
 
             {radarData.length === 0 ? (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 8, padding: "60px 0", opacity: 0.45 }}>
@@ -338,7 +341,7 @@ export default function Analytics({ onOpenSettings }) {
 
             {/* Stacked answer distribution */}
             <div style={{ marginTop: 8 }}>
-              <SectionHead icon={ICONS.trend} title="答题分布总览" iconColor="#1e78ff" />
+              <SectionHead icon={ICONS.trend} title="答题分布总览" iconColor="var(--info)" iconBg="var(--info-soft)" />
               <div style={{ marginTop: 12 }}>
                 <StackedBar
                   correct={stats.correctCount}
@@ -354,22 +357,22 @@ export default function Analytics({ onOpenSettings }) {
 
             {/* Donut trio */}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <SectionHead icon={ICONS.pie} title="核心指标" iconColor="#f39c12" />
+              <SectionHead icon={ICONS.pie} title="核心指标" iconColor="var(--warning)" iconBg="var(--warning-soft)" />
               <div style={{
                 display: "flex", justifyContent: "space-around", alignItems: "flex-start",
                 padding: "16px 8px 12px",
-                background: "rgba(109,94,251,0.03)", borderRadius: 12,
+                background: "var(--surface-soft)", borderRadius: 12,
                 border: "1px solid var(--line)",
               }}>
                 {[
-                  { pct: completionRate,   color: "#6d5efb", label: "完成度" },
-                  { pct: stats.accuracy,   color: "#00b894", label: "正确率" },
+                  { pct: completionRate,   color: "var(--accent)", track: "var(--accent-soft-bg)", label: "完成度" },
+                  { pct: stats.accuracy,   color: "var(--success)", track: "var(--success-soft)", label: "正确率" },
                   { pct: totalPossible > 0 ? Math.round((stats.wrongCount / totalPossible) * 100) : 0,
-                    color: "#e74c3c", label: "错误率" },
+                    color: "var(--danger)", track: "var(--danger-soft)", label: "错误率" },
                 ].map(r => (
                   <div key={r.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                     <div style={{ position: "relative" }}>
-                      <DonutRing pct={r.pct} size={68} stroke={6} color={r.color} label="" />
+                      <DonutRing pct={r.pct} size={68} stroke={6} color={r.color} track={r.track} label="" />
                       <div style={{
                         position: "absolute", inset: 0, display: "flex",
                         alignItems: "center", justifyContent: "center",
@@ -386,11 +389,11 @@ export default function Analytics({ onOpenSettings }) {
 
             {/* Stats breakdown */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <SectionHead icon={ICONS.flash} title="答题明细" iconColor="#00b894" />
+              <SectionHead icon={ICONS.flash} title="答题明细" iconColor="var(--success)" iconBg="var(--success-soft)" />
               <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                 {[
-                  { label: "正确解答", val: stats.correctCount, unit: "道", color: "#00b894", icon: ICONS.check },
-                  { label: "错误 / 跳过", val: stats.wrongCount, unit: "道", color: "#e74c3c", icon: ICONS.cross },
+                  { label: "正确解答", val: stats.correctCount, unit: "道", color: "var(--success)", icon: ICONS.check },
+                  { label: "错误 / 跳过", val: stats.wrongCount, unit: "道", color: "var(--danger)", icon: ICONS.cross },
                   { label: "尚未练习", val: unanswered, unit: "道", color: "var(--muted)", icon: ICONS.clock },
                   { label: "总做题量", val: stats.totalDone, unit: "道", color: "var(--accent)", icon: ICONS.trend, bold: true },
                 ].map((row, i, arr) => (
@@ -419,14 +422,14 @@ export default function Analytics({ onOpenSettings }) {
 
             {/* AI terminal */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
-              <SectionHead icon={ICONS.chat} title="AI 智能诊断" iconColor="#B53471" />
+              <SectionHead icon={ICONS.chat} title="AI 智能诊断" iconColor="var(--category-shuliang)" iconBg="var(--neutral-soft-bg)" />
               <div style={{
                 flex: 1, borderRadius: 10, padding: "14px",
-                background: "rgba(181,52,113,0.03)",
-                border: "1px dashed rgba(109,94,251,0.25)",
+                background: "var(--surface-soft)",
+                border: "1px dashed var(--accent-border-soft)",
                 fontSize: 12, color: "var(--muted)", lineHeight: 1.65,
                 fontFamily: "monospace", display: "flex", flexDirection: "column", gap: 8,
-                backgroundImage: "radial-gradient(rgba(109,94,251,0.08) 1px, transparent 1px)",
+                backgroundImage: "radial-gradient(var(--accent-soft-bg-strong) 1px, transparent 1px)",
                 backgroundSize: "34px 34px",
               }}>
                 {diagnosisLoading ? (
@@ -436,7 +439,7 @@ export default function Analytics({ onOpenSettings }) {
                 ) : diagnosis ? (
                   <div style={{ whiteSpace: "pre-wrap", color: "var(--text)", lineHeight: 1.7 }}>{diagnosis}</div>
                 ) : diagnosisError ? (
-                  <div style={{ color: "#e74c3c", lineHeight: 1.7 }}>
+                  <div style={{ color: "var(--danger)", lineHeight: 1.7 }}>
                     <span style={{ color: "var(--accent)", fontWeight: 600 }}>[ERROR]</span> {diagnosisError}
                   </div>
                 ) : (
@@ -448,14 +451,14 @@ export default function Analytics({ onOpenSettings }) {
                 <div
                   style={{
                     marginTop: "auto", display: "inline-flex", alignItems: "center", gap: 5,
-                    padding: "5px 10px", background: "rgba(109,94,251,0.09)",
+                    padding: "5px 10px", background: "var(--accent-soft-bg)",
                     color: "var(--accent)", borderRadius: 6, cursor: "pointer",
                     fontSize: 11, fontFamily: "sans-serif", fontWeight: 500,
-                    border: "1px solid rgba(109,94,251,0.15)", transition: "background 0.2s",
+                    border: "1px solid var(--accent-border-soft)", transition: "background 0.2s",
                     alignSelf: "flex-start",
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = "rgba(109,94,251,0.15)"}
-                  onMouseLeave={e => e.currentTarget.style.background = "rgba(109,94,251,0.09)"}
+                  onMouseEnter={e => e.currentTarget.style.background = "var(--accent-soft-bg-strong)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "var(--accent-soft-bg)"}
                   onClick={handleGenerateDiagnosis}
                 >
                   <Icon path={<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01"/>} size={11} color="var(--accent)" sw={2} />

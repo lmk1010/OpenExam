@@ -40,17 +40,17 @@ function getSavedPaperMeta(type) {
     return {
       label: "AI 练习",
       action: "开始练习",
-      color: "#059669",
-      background: "rgba(16,185,129,0.12)",
-      border: "rgba(16,185,129,0.18)",
+      color: "var(--success)",
+      background: "var(--success-soft)",
+      border: "var(--success-border)",
     };
   }
   return {
     label: "AI 试卷",
     action: "开始答题",
     color: "var(--accent)",
-    background: "rgba(109,94,251,0.1)",
-    border: "rgba(109,94,251,0.16)",
+    background: "var(--accent-soft-bg)",
+    border: "var(--accent-border-soft)",
   };
 }
 
@@ -371,12 +371,12 @@ export default function AIGenerate({ onOpenPaper }) {
       <header style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
         <div className="breadcrumb" style={{ margin: 0 }}>AI 出卷 &gt; 智能生成</div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, borderBottom: "1px solid var(--line)", paddingBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(109,94,251,0.1)", display: "grid", placeItems: "center", color: "var(--accent)" }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: "var(--accent-soft-bg)", display: "grid", placeItems: "center", color: "var(--accent)" }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           </div>
           <h2 style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.3px", margin: 0 }}>AI 智能出卷</h2>
           {!isAIConfigured() && (
-            <span style={{ fontSize: 11, color: "#e67e22", marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: "rgba(230,126,34,0.1)", borderRadius: 20 }}>
+            <span style={{ fontSize: 11, color: "var(--warning)", marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: "var(--warning-soft)", borderRadius: 20 }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               AI 未配置
             </span>
@@ -399,7 +399,7 @@ export default function AIGenerate({ onOpenPaper }) {
                     style={{ 
                       fontSize: 11, padding: "4px 12px", borderRadius: 16, cursor: "pointer", transition: "all 0.2s",
                       ...(config.category === c.key ? 
-                        { background: "var(--accent)", color: "#fff", border: "1px solid var(--accent)", boxShadow: "0 2px 8px rgba(109,94,251,0.25)" } : 
+                        { background: "var(--accent)", color: "#fff", border: "1px solid var(--accent)", boxShadow: "0 8px 18px rgba(15,23,42,0.08)" } : 
                         { background: "transparent", color: "var(--muted)", border: "1px solid var(--line)" }) 
                     }}>
                     {c.name}
@@ -458,7 +458,7 @@ export default function AIGenerate({ onOpenPaper }) {
             </div>
           </div>
 
-          {error && <div style={{ padding: "6px 10px", borderRadius: 6, background: "rgba(231,76,60,0.06)", color: "#c0392b", fontSize: 10, display: "flex", gap: 4, alignItems: "flex-start" }}>
+          {error && <div style={{ padding: "6px 10px", borderRadius: 6, background: "var(--danger-soft)", color: "var(--danger)", fontSize: 10, display: "flex", gap: 4, alignItems: "flex-start" }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             <span style={{ lineHeight: 1.4 }}>{error}</span>
           </div>}
@@ -468,7 +468,7 @@ export default function AIGenerate({ onOpenPaper }) {
               style={{ 
                 marginTop: "auto", padding: "10px 0", borderRadius: 6, border: "none",
                 background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                width: "100%", transition: "all 0.2s", boxShadow: "0 4px 12px rgba(109,94,251,0.2)"
+                width: "100%", transition: "all 0.2s", boxShadow: "0 10px 20px rgba(15,23,42,0.08)"
               }}>
               开始生成试卷
             </button>
@@ -479,7 +479,7 @@ export default function AIGenerate({ onOpenPaper }) {
                 生成中... {Math.round(progress)}%
               </button>
               <button onClick={handleCancelGenerate}
-                style={{ padding: "10px 0", borderRadius: 6, border: "1px solid rgba(231,76,60,0.45)", background: "rgba(231,76,60,0.08)", color: "#c0392b", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                style={{ padding: "10px 0", borderRadius: 6, border: "1px solid var(--danger-border)", background: "var(--danger-soft)", color: "var(--danger)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                 取消生成
               </button>
             </div>
@@ -496,7 +496,7 @@ export default function AIGenerate({ onOpenPaper }) {
                 padding: "6px 10px",
                 borderRadius: 8,
                 border: "1px solid var(--line)",
-                background: showHistory ? "rgba(109,94,251,0.1)" : "var(--surface)",
+                background: showHistory ? "var(--accent-soft-bg)" : "var(--surface)",
                 color: showHistory ? "var(--accent)" : "var(--text)",
                 fontSize: 11,
                 fontWeight: 600,
@@ -517,13 +517,13 @@ export default function AIGenerate({ onOpenPaper }) {
                   {phaseText} · {elapsedText}
                 </div>
               </div>
-              <div style={{ height: 7, borderRadius: 999, background: "rgba(0,0,0,0.08)", overflow: "hidden" }}>
-                <div style={{ width: `${Math.max(0, Math.min(100, progress))}%`, height: "100%", borderRadius: 999, background: generating ? "linear-gradient(90deg, #6d5efb, #4f7cff)" : (error ? "#e74c3c" : "#00b894"), transition: "width 0.25s ease" }} />
+              <div style={{ height: 7, borderRadius: 999, background: "var(--neutral-soft-bg)", overflow: "hidden" }}>
+                <div style={{ width: `${Math.max(0, Math.min(100, progress))}%`, height: "100%", borderRadius: 999, background: generating ? "linear-gradient(90deg, var(--accent), var(--info))" : (error ? "var(--danger)" : "var(--success)"), transition: "width 0.25s ease" }} />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 112, overflowY: "auto", paddingRight: 2 }}>
                 {feedback.length ? feedback.map((item) => (
                   <div key={item.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 10 }}>
-                    <span style={{ color: item.type === "error" ? "#c0392b" : item.type === "success" ? "#00b894" : item.type === "warning" ? "#e67e22" : "var(--text)", lineHeight: 1.5 }}>{item.text}</span>
+                    <span style={{ color: item.type === "error" ? "var(--danger)" : item.type === "success" ? "var(--success)" : item.type === "warning" ? "var(--warning)" : "var(--text)", lineHeight: 1.5 }}>{item.text}</span>
                     <span style={{ color: "var(--muted)", flexShrink: 0 }}>{item.time}</span>
                   </div>
                 )) : (
@@ -534,18 +534,18 @@ export default function AIGenerate({ onOpenPaper }) {
           )}
 
           {lastSavedPaper && (
-            <div style={{ border: "1px solid rgba(16,185,129,0.16)", borderRadius: 12, background: "linear-gradient(180deg, rgba(16,185,129,0.08), rgba(16,185,129,0.03))", padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ border: "1px solid var(--success-border)", borderRadius: 12, background: "linear-gradient(180deg, var(--success-soft), rgba(73,182,148,0.04))", padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#047857" }}>已持久化保存</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--success)" }}>已持久化保存</div>
                 <div style={{ fontSize: 11, color: "var(--text)", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {lastSavedPaper.title} · {lastSavedPaper.type === "ai_practice" ? "AI 练习" : "AI 试卷"}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                <button onClick={() => handleStartHistoryPaper(lastSavedPaper)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(16,185,129,0.22)", background: "#fff", color: "#047857", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                <button onClick={() => handleStartHistoryPaper(lastSavedPaper)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--success-border)", background: "var(--surface)", color: "var(--success)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                   立即使用
                 </button>
-                <button onClick={() => setShowHistory((prev) => !prev)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid rgba(16,185,129,0.14)", background: "rgba(255,255,255,0.72)", color: "#047857", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                <button onClick={() => setShowHistory((prev) => !prev)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--success-border)", background: "var(--surface-overlay-soft)", color: "var(--success)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                   {showHistory ? "收起列表" : "查看已保存"}
                 </button>
               </div>
@@ -561,7 +561,7 @@ export default function AIGenerate({ onOpenPaper }) {
                 </button>
               </div>
               {historyError ? (
-                <div style={{ fontSize: 11, color: "#c0392b", lineHeight: 1.5 }}>{historyError}</div>
+                <div style={{ fontSize: 11, color: "var(--danger)", lineHeight: 1.5 }}>{historyError}</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 180, overflowY: "auto", paddingRight: 2 }}>
                   {historyPapers.map((paper) => {
@@ -605,7 +605,7 @@ export default function AIGenerate({ onOpenPaper }) {
                             <button
                               onClick={() => handleConfirmRenamePaper(paper.id)}
                               disabled={isBusy}
-                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid rgba(109,94,251,0.18)", background: "rgba(109,94,251,0.08)", color: "var(--accent)", fontSize: 11, cursor: isBusy ? "wait" : "pointer", fontWeight: 600 }}
+                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--accent-border-soft)", background: "var(--accent-soft-bg)", color: "var(--accent)", fontSize: 11, cursor: isBusy ? "wait" : "pointer", fontWeight: 600 }}
                             >
                               {actionBusy === `rename:${paper.id}` ? "保存中..." : "保存"}
                             </button>
@@ -622,7 +622,7 @@ export default function AIGenerate({ onOpenPaper }) {
                             <button
                               onClick={() => handleDeletePaper(paper)}
                               disabled={isBusy}
-                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.08)", color: "#b42318", fontSize: 11, cursor: isBusy ? "wait" : "pointer", fontWeight: 600 }}
+                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--danger-border)", background: "var(--danger-soft)", color: "var(--danger)", fontSize: 11, cursor: isBusy ? "wait" : "pointer", fontWeight: 600 }}
                             >
                               {actionBusy === `delete:${paper.id}` ? "删除中..." : "确认删除"}
                             </button>
@@ -650,7 +650,7 @@ export default function AIGenerate({ onOpenPaper }) {
                             </button>
                             <button
                               onClick={() => handleAskDeletePaper(paper.id)}
-                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.14)", background: "rgba(239,68,68,0.05)", color: "#b42318", fontSize: 11, cursor: "pointer", fontWeight: 600 }}
+                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--danger-border)", background: "var(--danger-soft)", color: "var(--danger)", fontSize: 11, cursor: "pointer", fontWeight: 600 }}
                             >
                               删除
                             </button>
@@ -666,9 +666,9 @@ export default function AIGenerate({ onOpenPaper }) {
           
           {generated ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 12, overflow: "auto", paddingRight: 8 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 16px", background: "linear-gradient(180deg, rgba(109,94,251,0.06), rgba(109,94,251,0.02))", borderRadius: 12, border: "1px solid rgba(109,94,251,0.12)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 16px", background: "linear-gradient(180deg, var(--accent-soft-bg), rgba(117,109,232,0.03))", borderRadius: 12, border: "1px solid var(--accent-border-soft)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 6, background: "rgba(109,94,251,0.1)", color: "var(--accent)", display: "grid", placeItems: "center" }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 6, background: "var(--accent-soft-bg)", color: "var(--accent)", display: "grid", placeItems: "center" }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -692,13 +692,13 @@ export default function AIGenerate({ onOpenPaper }) {
                     <button onClick={() => handleSave("ai_exam")} disabled={!!actionBusy} style={{ background: "var(--surface)", color: "var(--accent)", border: "1px solid var(--accent)", fontSize: 11, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer", transition: "all 0.2s" }}>
                       {actionBusy === "save:ai_exam" ? "保存中..." : "保存试卷"}
                     </button>
-                    <button onClick={() => handleSave("ai_practice")} disabled={!!actionBusy} style={{ background: "rgba(16,185,129,0.08)", color: "#059669", border: "1px solid rgba(16,185,129,0.18)", fontSize: 11, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer" }}>
+                    <button onClick={() => handleSave("ai_practice")} disabled={!!actionBusy} style={{ background: "var(--success-soft)", color: "var(--success)", border: "1px solid var(--success-border)", fontSize: 11, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer" }}>
                       {actionBusy === "save:ai_practice" ? "保存中..." : "保存练习"}
                     </button>
                     <button onClick={handleExportGeneratedPdf} disabled={!!actionBusy} style={{ background: "var(--surface)", color: "var(--text)", border: "1px solid var(--line)", fontSize: 11, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer" }}>
                       {actionBusy === "pdf" ? "导出中..." : "导出 PDF"}
                     </button>
-                    <button onClick={handleShareGenerated} disabled={!!actionBusy} style={{ background: "rgba(109,94,251,0.08)", color: "var(--accent)", border: "1px solid rgba(109,94,251,0.16)", fontSize: 11, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer" }}>
+                    <button onClick={handleShareGenerated} disabled={!!actionBusy} style={{ background: "var(--accent-soft-bg)", color: "var(--accent)", border: "1px solid var(--accent-border-soft)", fontSize: 11, fontWeight: 600, padding: "7px 12px", borderRadius: 8, cursor: actionBusy ? "wait" : "pointer" }}>
                       {actionBusy === "share" ? "复制中..." : "复制分享"}
                     </button>
                   </div>
@@ -719,7 +719,7 @@ export default function AIGenerate({ onOpenPaper }) {
                       {Array.isArray(q.options) && q.options.length > 0 && (
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                           {q.options.map((opt, idx) => (
-                            <div key={`${i}_${opt.key || idx}`} style={{ fontSize: 11, color: "var(--muted)", background: "rgba(0,0,0,0.03)", border: "1px solid var(--line)", borderRadius: 6, padding: "6px 8px", lineHeight: 1.5 }}>
+                            <div key={`${i}_${opt.key || idx}`} style={{ fontSize: 11, color: "var(--muted)", background: "var(--neutral-soft-bg)", border: "1px solid var(--line)", borderRadius: 6, padding: "6px 8px", lineHeight: 1.5 }}>
                               <strong style={{ color: "var(--text)", marginRight: 4 }}>{opt.key || String.fromCharCode(65 + idx)}.</strong>
                               {opt.content}
                             </div>

@@ -11,7 +11,7 @@ const categoryNames = {
 };
 
 // 简约折线图组件
-const TrendChart = ({ data, color = '#6d5efb' }) => {
+const TrendChart = ({ data, color = 'var(--accent)' }) => {
   const points = data.length > 0 ? data : [50, 60, 45, 70, 65, 80, 75];
   const max = Math.max(...points, 100);
   const min = Math.min(...points, 0);
@@ -106,10 +106,10 @@ export default function ExamResult({ result, onBack }) {
   };
 
   const getScoreLevel = (accuracy) => {
-    if (accuracy >= 90) return { text: '优秀', color: '#10b981' };
-    if (accuracy >= 80) return { text: '良好', color: '#6d5efb' };
-    if (accuracy >= 60) return { text: '及格', color: '#f59e0b' };
-    return { text: '需加强', color: '#ef4444' };
+    if (accuracy >= 90) return { text: '优秀', color: 'var(--success)', bg: 'var(--success-soft)' };
+    if (accuracy >= 80) return { text: '良好', color: 'var(--accent)', bg: 'var(--accent-soft-bg)' };
+    if (accuracy >= 60) return { text: '及格', color: 'var(--warning)', bg: 'var(--warning-soft)' };
+    return { text: '需加强', color: 'var(--danger)', bg: 'var(--danger-soft)' };
   };
 
   // 计算正确率
@@ -220,7 +220,7 @@ export default function ExamResult({ result, onBack }) {
           <div className="score-info">
             <div className="score-info-row">
               <h2>{resultTitle}</h2>
-              <span className="score-badge" style={{ background: `${level.color}15`, color: level.color }}>{level.text}</span>
+              <span className="score-badge" style={{ background: level.bg, color: level.color }}>{level.text}</span>
             </div>
             <span className="score-subtext">{resultSubtitle}</span>
           </div>
@@ -228,28 +228,28 @@ export default function ExamResult({ result, onBack }) {
 
         <div className="result-quick-stats">
           <div className="quick-stat">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
             <span className="qs-value">{correctCount}</span>
             <span className="qs-label">正确</span>
           </div>
           <div className="quick-stat">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
             <span className="qs-value">{wrongCount}</span>
             <span className="qs-label">错误</span>
           </div>
           <div className="quick-stat">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6d5efb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
             </svg>
             <span className="qs-value">{formatDuration(timeElapsed)}</span>
             <span className="qs-label">用时</span>
           </div>
           <div className="quick-stat">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
             </svg>
             <span className="qs-value">{avgTimePerQuestion}s</span>
@@ -278,7 +278,7 @@ export default function ExamResult({ result, onBack }) {
       <div className="result-grid">
         {/* 第一行：4个指标卡片 */}
         <div className="result-card metric">
-          <div className="metric-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+          <div className="metric-icon" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
@@ -287,11 +287,11 @@ export default function ExamResult({ result, onBack }) {
             <span className="metric-value">{correctCount}</span>
             <span className="metric-label">正确题数</span>
           </div>
-          <span className="metric-rate" style={{ color: '#10b981' }}>{accuracy}%</span>
+          <span className="metric-rate" style={{ color: 'var(--success)' }}>{accuracy}%</span>
         </div>
 
         <div className="result-card metric">
-          <div className="metric-icon" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>
+          <div className="metric-icon" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
@@ -300,11 +300,11 @@ export default function ExamResult({ result, onBack }) {
             <span className="metric-value">{wrongCount}</span>
             <span className="metric-label">错误题数</span>
           </div>
-          <span className="metric-rate" style={{ color: '#ef4444' }}>{totalCount > 0 ? Math.round(wrongCount / totalCount * 100) : 0}%</span>
+          <span className="metric-rate" style={{ color: 'var(--danger)' }}>{totalCount > 0 ? Math.round(wrongCount / totalCount * 100) : 0}%</span>
         </div>
 
         <div className="result-card metric">
-          <div className="metric-icon" style={{ background: 'rgba(109, 94, 251, 0.1)', color: '#6d5efb' }}>
+          <div className="metric-icon" style={{ background: 'var(--accent-soft-bg)', color: 'var(--accent)' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
             </svg>
@@ -313,11 +313,11 @@ export default function ExamResult({ result, onBack }) {
             <span className="metric-value">{formatDuration(timeElapsed)}</span>
             <span className="metric-label">总用时</span>
           </div>
-          <span className="metric-rate" style={{ color: '#6d5efb' }}>{avgTimePerQuestion}s/题</span>
+          <span className="metric-rate" style={{ color: 'var(--accent)' }}>{avgTimePerQuestion}s/题</span>
         </div>
 
         <div className="result-card metric">
-          <div className="metric-icon" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>
+          <div className="metric-icon" style={{ background: 'var(--warning-soft)', color: 'var(--warning)' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>
             </svg>
@@ -326,7 +326,7 @@ export default function ExamResult({ result, onBack }) {
             <span className="metric-value">{totalCount}</span>
             <span className="metric-label">总题数</span>
           </div>
-          <span className="metric-rate" style={{ color: '#f59e0b' }}>{unansweredCount}未答</span>
+          <span className="metric-rate" style={{ color: 'var(--warning)' }}>{unansweredCount}未答</span>
         </div>
 
         {/* 第二行：趋势图 + 分类统计 */}
@@ -339,7 +339,7 @@ export default function ExamResult({ result, onBack }) {
             <span className="card-badge">{accuracy}%</span>
           </div>
           <div className="chart-area">
-            <TrendChart data={[65, 72, 58, 80, 75, 85, accuracy]} color="#6d5efb" />
+            <TrendChart data={[65, 72, 58, 80, 75, 85, accuracy]} color="var(--accent)" />
           </div>
           <div className="chart-footer">
             <span>近7次练习</span>
@@ -362,10 +362,10 @@ export default function ExamResult({ result, onBack }) {
                 <div key={cat} className="category-row-full">
                   <span className="cat-name-full">{categoryNames[cat]}</span>
                   <div className="cat-bar-wrap-full">
-                    <div className="cat-bar-full" style={{ width: `${catAccuracy}%`, background: stat.total === 0 ? 'var(--line)' : (catAccuracy >= 60 ? '#10b981' : '#ef4444') }}/>
+                    <div className="cat-bar-full" style={{ width: `${catAccuracy}%`, background: stat.total === 0 ? 'var(--line)' : (catAccuracy >= 60 ? 'var(--success)' : 'var(--danger)') }}/>
                   </div>
                   <span className="cat-stat-full">{stat.correct}/{stat.total}</span>
-                  <span className="cat-pct" style={{ color: stat.total === 0 ? 'var(--muted)' : (catAccuracy >= 60 ? '#10b981' : '#ef4444') }}>{catAccuracy}%</span>
+                  <span className="cat-pct" style={{ color: stat.total === 0 ? 'var(--muted)' : (catAccuracy >= 60 ? 'var(--success)' : 'var(--danger)') }}>{catAccuracy}%</span>
                 </div>
               );
             })}
@@ -446,7 +446,7 @@ export default function ExamResult({ result, onBack }) {
           <div className="suggest-list">
             {Object.entries(categoryStats).filter(([_, stat]) => stat.total > 0 && (stat.correct / stat.total) < 0.6).slice(0, 3).map(([cat]) => (
               <div key={cat} className="suggest-item">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2">
                   <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                 </svg>
                 <span>{categoryNames[cat] || cat} 正确率较低，建议加强练习</span>
@@ -454,14 +454,14 @@ export default function ExamResult({ result, onBack }) {
             ))}
             {Object.entries(categoryStats).filter(([_, stat]) => stat.total > 0 && (stat.correct / stat.total) < 0.6).length === 0 && (
               <div className="suggest-item success">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2">
                   <polyline points="20 6 9 17 4 12"/>
                 </svg>
                 <span>各分类表现良好，继续保持！</span>
               </div>
             )}
             <div className="suggest-item">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6d5efb" strokeWidth="2">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
                 <path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/>
               </svg>
               <span>平均每题 {avgTimePerQuestion} 秒，{avgTimePerQuestion > 60 ? '可适当提速' : '速度良好'}</span>

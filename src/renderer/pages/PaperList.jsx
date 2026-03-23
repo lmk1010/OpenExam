@@ -194,7 +194,7 @@ export default function PaperList({ onOpenPaper }) {
       </div>
 
       {statusMessage && (
-        <div style={{ marginBottom: 14, padding: '11px 14px', borderRadius: 14, border: statusMessage.type === 'error' ? '1px solid rgba(239,68,68,0.18)' : '1px solid rgba(16,185,129,0.18)', background: statusMessage.type === 'error' ? 'rgba(239,68,68,0.06)' : 'rgba(16,185,129,0.07)', color: statusMessage.type === 'error' ? '#b42318' : '#027a48', fontSize: 12, lineHeight: 1.6 }}>
+        <div style={{ marginBottom: 14, padding: '11px 14px', borderRadius: 14, border: statusMessage.type === 'error' ? '1px solid var(--danger-border)' : '1px solid var(--success-border)', background: statusMessage.type === 'error' ? 'var(--danger-soft)' : 'var(--success-soft)', color: statusMessage.type === 'error' ? 'var(--danger)' : 'var(--success)', fontSize: 12, lineHeight: 1.6 }}>
           {statusMessage.text}
         </div>
       )}
@@ -226,7 +226,7 @@ export default function PaperList({ onOpenPaper }) {
               <button onClick={() => handleExportPaper(paper)} disabled={busyAction === `pdf:${paper.id}`} style={{ padding: '0 12px', borderRadius: 12, border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: busyAction ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
                 {busyAction === `pdf:${paper.id}` ? '导出中...' : 'PDF'}
               </button>
-              <button onClick={() => handleSharePaper(paper)} disabled={busyAction === `share:${paper.id}`} style={{ padding: '0 12px', borderRadius: 12, border: '1px solid rgba(109,94,251,0.18)', background: 'rgba(109,94,251,0.08)', color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: busyAction ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
+              <button onClick={() => handleSharePaper(paper)} disabled={busyAction === `share:${paper.id}`} style={{ padding: '0 12px', borderRadius: 12, border: '1px solid var(--accent-border-soft)', background: 'var(--accent-soft-bg)', color: 'var(--accent)', fontSize: 12, fontWeight: 700, cursor: busyAction ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
                 {busyAction === `share:${paper.id}` ? '复制中...' : '分享'}
               </button>
             </div>

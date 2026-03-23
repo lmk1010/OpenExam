@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AI_PROVIDERS, DEFAULT_AI_SETTINGS, getAIProvider, normalizeAISettings } from '../store/aiSettings.js';
 import CustomSelect from '../components/CustomSelect.jsx';
+import appLogo from '../assets/openexam-logo.png';
 
 const ProviderIcon = ({ type }) => {
   const icons = {
@@ -204,7 +205,7 @@ export default function Settings({ onBack }) {
       <header style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
         <div className="breadcrumb" style={{ margin: 0 }}>设置 &gt; 系统选项</div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, borderBottom: "1px solid var(--line)", paddingBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(109,94,251,0.1)", display: "grid", placeItems: "center", color: "var(--accent)" }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: "var(--accent-soft-bg)", display: "grid", placeItems: "center", color: "var(--accent)" }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
             </svg>
@@ -226,7 +227,7 @@ export default function Settings({ onBack }) {
             <button key={item.id} onClick={() => setActiveSection(item.id)}
               style={{
                 display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, border: "none", cursor: "pointer", transition: "all 0.2s", fontSize: 13, fontWeight: activeSection === item.id ? 600 : 500,
-                ...(activeSection === item.id ? { background: "var(--accent)", color: "#fff", boxShadow: "0 4px 12px rgba(109,94,251,0.2)" } : { background: "transparent", color: "var(--muted)" })
+                ...(activeSection === item.id ? { background: "var(--accent)", color: "#fff", boxShadow: "0 8px 18px rgba(15,23,42,0.08)" } : { background: "transparent", color: "var(--muted)" })
               }}
               onMouseOver={e => { if (activeSection !== item.id) e.currentTarget.style.background = "var(--surface-soft)"; }}
               onMouseOut={e => { if (activeSection !== item.id) e.currentTarget.style.background = "transparent"; }}
@@ -251,7 +252,7 @@ export default function Settings({ onBack }) {
                   <button key={provider.id} onClick={() => handleProviderChange(provider.id)}
                     style={{
                       display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "16px 10px", borderRadius: 10, border: "1px solid", cursor: "pointer", transition: "all 0.2s",
-                      ...(settings.aiProvider === provider.id ? { background: "rgba(109,94,251,0.05)", borderColor: "var(--accent)", color: "var(--text)", boxShadow: "0 4px 12px rgba(109,94,251,0.1)" } : { background: "var(--surface)", borderColor: "var(--line)", color: "var(--muted)" })
+                      ...(settings.aiProvider === provider.id ? { background: "var(--accent-soft-bg)", borderColor: "var(--accent)", color: "var(--text)", boxShadow: "0 10px 22px rgba(15,23,42,0.06)" } : { background: "var(--surface)", borderColor: "var(--line)", color: "var(--muted)" })
                     }}
                   >
                     <div style={{ color: settings.aiProvider === provider.id ? "var(--accent)" : "inherit" }}>
@@ -259,7 +260,7 @@ export default function Settings({ onBack }) {
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: settings.aiProvider === provider.id ? 600 : 500 }}>
                       {provider.name}
-                      {provider.supportsVision && <span style={{ fontSize: 9, padding: "2px 4px", borderRadius: 4, background: "rgba(109,94,251,0.1)", color: "var(--accent)" }}>视觉</span>}
+                      {provider.supportsVision && <span style={{ fontSize: 9, padding: "2px 4px", borderRadius: 4, background: "var(--accent-soft-bg)", color: "var(--accent)" }}>视觉</span>}
                     </div>
                   </button>
                 ))}
@@ -325,7 +326,7 @@ export default function Settings({ onBack }) {
                     <button onClick={handleTest} disabled={testStatus === 'testing'} style={{ flex: 1, padding: "10px 0", borderRadius: 6, border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontSize: 13, fontWeight: 600, cursor: testStatus === 'testing' ? "wait" : "pointer" }}>
                       {testStatus === 'testing' ? '测试中...' : testStatus === 'success' ? '✓ 连接成功' : testStatus === 'error' ? '× 连接失败' : '测试连接'}
                     </button>
-                    <button onClick={handleSave} style={{ flex: 1, padding: "10px 0", borderRadius: 6, border: "1px solid var(--accent)", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 12px rgba(109,94,251,0.2)" }}>
+                    <button onClick={handleSave} style={{ flex: 1, padding: "10px 0", borderRadius: 6, border: "1px solid var(--accent)", background: "var(--accent)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", boxShadow: "0 8px 18px rgba(15,23,42,0.08)" }}>
                       {testStatus === 'saved' ? '已保存 ✓' : '保存配置'}
                     </button>
                   </div>
@@ -333,7 +334,7 @@ export default function Settings({ onBack }) {
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
                     <div style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)" }}>
                       <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>配置存储</div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: persistStatus === 'sqlite' ? '#00b894' : 'var(--text)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: persistStatus === 'sqlite' ? 'var(--success)' : 'var(--text)' }}>
                         {persistStatus === 'loading' ? '读取中...' : persistStatus === 'sqlite' ? 'SQLite 持久化' : '仅本地缓存'}
                       </div>
                       <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
@@ -342,7 +343,7 @@ export default function Settings({ onBack }) {
                     </div>
                     <div style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)" }}>
                       <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>连接状态</div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: connectionState?.status === 'success' ? '#00b894' : connectionState?.status === 'error' ? '#e74c3c' : 'var(--text)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: connectionState?.status === 'success' ? 'var(--success)' : connectionState?.status === 'error' ? 'var(--danger)' : 'var(--text)' }}>
                         {connectionState?.status === 'success' ? '已验证可用' : connectionState?.status === 'error' ? '验证失败' : '未验证'}
                       </div>
                       <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
@@ -367,7 +368,7 @@ export default function Settings({ onBack }) {
                           key={key}
                           type="button"
                           onClick={() => setSettings(prev => ({ ...prev, recognizeEngine: key }))}
-                          style={{ padding: '10px 12px', borderRadius: 8, border: settings.recognizeEngine === key ? '1px solid var(--accent)' : '1px solid var(--line)', background: settings.recognizeEngine === key ? 'rgba(109,94,251,0.06)' : 'var(--surface)', color: settings.recognizeEngine === key ? 'var(--accent)' : 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                          style={{ padding: '10px 12px', borderRadius: 8, border: settings.recognizeEngine === key ? '1px solid var(--accent)' : '1px solid var(--line)', background: settings.recognizeEngine === key ? 'var(--accent-soft-bg)' : 'var(--surface)', color: settings.recognizeEngine === key ? 'var(--accent)' : 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
                         >
                           {label}
                         </button>
@@ -439,7 +440,7 @@ export default function Settings({ onBack }) {
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "20px", background: "var(--surface-soft)", borderRadius: 12, border: "1px solid var(--line)" }}>
-                <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(109,94,251,0.1)", color: "var(--accent)", display: "grid", placeItems: "center" }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--accent-soft-bg)", color: "var(--accent)", display: "grid", placeItems: "center" }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
                   </svg>
@@ -465,7 +466,7 @@ export default function Settings({ onBack }) {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "20px", background: "var(--surface-soft)", borderRadius: 12, border: "1px solid var(--line)" }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(109,94,251,0.1)", color: "var(--accent)", display: "grid", placeItems: "center" }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--accent-soft-bg)", color: "var(--accent)", display: "grid", placeItems: "center" }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                   </div>
                   <div>
@@ -475,15 +476,15 @@ export default function Settings({ onBack }) {
                   <button onClick={handleExportAllData} style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>导出所有数据</button>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "20px", background: "rgba(231,76,60,0.05)", borderRadius: 12, border: "1px solid rgba(231,76,60,0.2)" }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(231,76,60,0.1)", color: "#e74c3c", display: "grid", placeItems: "center" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "20px", background: "var(--danger-soft)", borderRadius: 12, border: "1px solid var(--danger-border)" }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--danger-soft)", color: "var(--danger)", display: "grid", placeItems: "center" }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                   </div>
                   <div>
-                    <h4 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px 0", color: "#e74c3c" }}>清空数据</h4>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px 0", color: "var(--danger)" }}>清空数据</h4>
                     <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>删除所有本地试题库、进度和记录。此操作不可恢复</p>
                   </div>
-                  <button onClick={handleClearAllData} style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "none", background: "#e74c3c", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>彻底清空数据</button>
+                  <button onClick={handleClearAllData} style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "none", background: "var(--danger)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>彻底清空数据</button>
                 </div>
               </div>
             </div>
@@ -491,14 +492,12 @@ export default function Settings({ onBack }) {
 
           {activeSection === 'about' && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, minHeight: 300 }}>
-              <div style={{ width: 56, height: 56, borderRadius: 14, background: "rgba(109,94,251,0.08)", border: "1px solid rgba(109,94,251,0.15)", display: "grid", placeItems: "center", color: "var(--accent)" }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h8M8 11h8M8 15h5"/>
-                </svg>
+              <div className="app-logo app-logo--about">
+                <img src={appLogo} alt="OpenExam" className="app-logo-image" />
               </div>
               <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 4, marginTop: 16 }}>
                 <h3 style={{ fontSize: 24, fontWeight: 700, margin: 0, color: "var(--text)", letterSpacing: "-0.5px" }}>OpenExam</h3>
-                <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600, background: "rgba(109,94,251,0.1)", padding: "4px 10px", borderRadius: 12, display: "inline-block", margin: "4px auto" }}>版本 0.1.0</span>
+                <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600, background: "var(--accent-soft-bg)", padding: "4px 10px", borderRadius: 12, display: "inline-block", margin: "4px auto" }}>版本 0.1.0</span>
                 <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>开源公考刷题应用</p>
               </div>
               <div style={{ display: "flex", gap: 16, marginTop: 24 }}>

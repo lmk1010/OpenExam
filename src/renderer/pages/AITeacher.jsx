@@ -99,7 +99,7 @@ function MsgContent({ content }) {
     return chunks.map((chunk, i) => {
       if (!chunk) return null;
       if (chunk.startsWith("`") && chunk.endsWith("`")) {
-        return <code key={i} style={{ background: "rgba(109,94,251,0.1)", color: "var(--accent)", borderRadius: 4, padding: "1px 5px", fontSize: 11 }}>{chunk.slice(1, -1)}</code>;
+        return <code key={i} style={{ background: "var(--accent-soft-bg)", color: "var(--accent)", borderRadius: 4, padding: "1px 5px", fontSize: 11 }}>{chunk.slice(1, -1)}</code>;
       }
       if (chunk.startsWith("**") && chunk.endsWith("**")) {
         return <strong key={i} style={{ fontWeight: 700, color: "var(--text)" }}>{chunk.slice(2, -2)}</strong>;
@@ -596,7 +596,7 @@ export default function AITeacher() {
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <div style={{ fontSize: 11, color: "var(--muted)" }}>我的 › AI 老师</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, #B53471 0%, #833471 100%)", display: "grid", placeItems: "center", color: "#fff", boxShadow: "0 3px 9px rgba(181,52,113,0.22)" }}>
+            <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%)", display: "grid", placeItems: "center", color: "#fff", boxShadow: "0 8px 18px rgba(15,23,42,0.08)" }}>
               <Ico d={ICONS.chat} size={13} col="#fff" sw={2} />
             </div>
             <h2 style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.3px", margin: 0 }}>AI 智能导师</h2>
@@ -605,12 +605,12 @@ export default function AITeacher() {
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {/* Status pill */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 11px", borderRadius: 16, background: configured ? "rgba(0,184,148,0.07)" : "rgba(231,76,60,0.07)", border: `1px solid ${configured ? "rgba(0,184,148,0.2)" : "rgba(231,76,60,0.2)"}` }}>
-            <span style={{ width: 5, height: 5, borderRadius: "50%", background: configured ? "#00b894" : "#e74c3c", display: "inline-block" }} />
-            <span style={{ fontSize: 11, fontWeight: 500, color: configured ? "#00b894" : "#e74c3c" }}>{configured ? "已连接" : "未配置"}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 11px", borderRadius: 16, background: configured ? "var(--success-soft)" : "var(--danger-soft)", border: `1px solid ${configured ? "var(--success-border)" : "var(--danger-border)"}` }}>
+            <span style={{ width: 5, height: 5, borderRadius: "50%", background: configured ? "var(--success)" : "var(--danger)", display: "inline-block" }} />
+            <span style={{ fontSize: 11, fontWeight: 500, color: configured ? "var(--success)" : "var(--danger)" }}>{configured ? "已连接" : "未配置"}</span>
           </div>
           {/* Msg count badge */}
-          <div style={{ padding: "4px 11px", borderRadius: 16, background: "rgba(109,94,251,0.06)", border: "1px solid rgba(109,94,251,0.12)", fontSize: 11, color: "var(--accent)", fontWeight: 500 }}>
+          <div style={{ padding: "4px 11px", borderRadius: 16, background: "var(--accent-soft-bg)", border: "1px solid var(--accent-border-soft)", fontSize: 11, color: "var(--accent)", fontWeight: 500 }}>
             {msgCount} 次问答
           </div>
           <button onClick={createNewSession} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface-soft)", color: "var(--text)", fontSize: 11, cursor: "pointer" }}>
@@ -639,7 +639,7 @@ export default function AITeacher() {
             <div style={{ fontSize: 10, fontWeight: 600, color: "var(--muted)", letterSpacing: "0.5px", marginBottom: 8 }}>会话列表</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 136, overflowY: "auto" }}>
               {sessions.map((session) => (
-                <button key={session.id} onClick={() => setActiveSessionId(session.id)} style={{ padding: "7px 8px", borderRadius: 8, border: "1px solid var(--line)", background: session.id === activeSessionId ? "rgba(109,94,251,0.08)" : "var(--surface-soft)", color: session.id === activeSessionId ? "var(--accent)" : "var(--text)", textAlign: "left", cursor: "pointer", fontSize: 10, lineHeight: 1.5 }}>
+                <button key={session.id} onClick={() => setActiveSessionId(session.id)} style={{ padding: "7px 8px", borderRadius: 8, border: "1px solid var(--line)", background: session.id === activeSessionId ? "var(--accent-soft-bg)" : "var(--surface-soft)", color: session.id === activeSessionId ? "var(--accent)" : "var(--text)", textAlign: "left", cursor: "pointer", fontSize: 10, lineHeight: 1.5 }}>
                   <div style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{session.title || "新会话"}</div>
                   <div style={{ color: "var(--muted)" }}>{session.message_count || 0} 条消息</div>
                 </button>
@@ -656,7 +656,7 @@ export default function AITeacher() {
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               {QUICK_PROMPTS.map((qp) => (
                 <button key={qp.label} onClick={() => sendMessage(qp.prompt)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: "var(--surface-soft)", border: "1px solid var(--line)", borderRadius: 8, fontSize: 11, color: "var(--text)", cursor: "pointer", textAlign: "left", transition: "all 0.18s", fontFamily: "inherit" }}
-                  onMouseOver={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; e.currentTarget.style.background = "rgba(109,94,251,0.04)"; }}
+                  onMouseOver={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; e.currentTarget.style.background = "var(--accent-soft-bg)"; }}
                   onMouseOut={e => { e.currentTarget.style.borderColor = "var(--line)"; e.currentTarget.style.color = "var(--text)"; e.currentTarget.style.background = "var(--surface-soft)"; }}>
                   <Ico d={qp.icon} size={12} sw={1.8} />
                   {qp.label}
@@ -725,7 +725,7 @@ export default function AITeacher() {
           <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--line)", flex: 0 }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: "var(--muted)", letterSpacing: "0.5px", marginBottom: 8 }}>当前题目上下文</div>
             {questionContext ? (
-              <div style={{ padding: "9px 10px", background: "rgba(109,94,251,0.04)", borderRadius: 8, border: "1px solid rgba(109,94,251,0.2)", fontSize: 10, color: "var(--muted)", lineHeight: 1.6 }}>
+              <div style={{ padding: "9px 10px", background: "var(--accent-soft-bg)", borderRadius: 8, border: "1px solid var(--accent-border-soft)", fontSize: 10, color: "var(--muted)", lineHeight: 1.6 }}>
                 <div style={{ color: "var(--accent)", fontWeight: 700, marginBottom: 4 }}>
                   [已注入{questionContext.source === "wrong" ? "·错题" : questionContext.source === "paper" ? "·题库" : ""}] 第{questionContext.index || "?"}题 / 共{questionContext.total || "?"}题
                 </div>
@@ -735,7 +735,7 @@ export default function AITeacher() {
                 <div>参考答案: {questionContext.answer || "未知"}</div>
               </div>
             ) : (
-              <div style={{ padding: "9px 10px", background: "rgba(109,94,251,0.04)", borderRadius: 8, border: "1px dashed rgba(109,94,251,0.2)", fontSize: 10, color: "var(--muted)", lineHeight: 1.6 }}>
+              <div style={{ padding: "9px 10px", background: "var(--accent-soft-bg)", borderRadius: 8, border: "1px dashed var(--accent-border-soft)", fontSize: 10, color: "var(--muted)", lineHeight: 1.6 }}>
                 <span style={{ color: "var(--accent)", fontWeight: 600 }}>[空]</span> 暂无题目上下文
                 <br/>完成答题后会自动注入最近一道题。
               </div>
@@ -751,7 +751,7 @@ export default function AITeacher() {
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {[
                 { label: "我的提问", val: msgCount,    col: "var(--accent)" },
-                { label: "AI 回复",  val: replyCount,  col: "#00b894" },
+                { label: "AI 回复",  val: replyCount,  col: "var(--success)" },
                 { label: "总轮次",   val: Math.max(msgCount, replyCount), col: "var(--muted)" },
               ].map((row, i, arr) => (
                 <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: i < arr.length - 1 ? "1px dashed var(--line)" : "none" }}>
@@ -788,7 +788,7 @@ export default function AITeacher() {
               <div style={{ fontSize: 12, color: "var(--muted)" }}>暂无可用会话，请先新建会话。</div>
             ) : messages.map((msg, i) => (
               <div key={i} style={{ display: "flex", gap: 10, maxWidth: msg.role === "user" ? "75%" : "92%", alignSelf: msg.role === "user" ? "flex-end" : "flex-start", flexDirection: msg.role === "user" ? "row-reverse" : "row" }}>
-                <div style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, display: "grid", placeItems: "center", background: msg.role === "user" ? "transparent" : "rgba(109,94,251,0.08)", color: msg.role === "user" ? "var(--muted)" : "var(--accent)", border: msg.role === "user" ? "1px solid var(--line)" : "none" }}>
+                <div style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, display: "grid", placeItems: "center", background: msg.role === "user" ? "transparent" : "var(--accent-soft-bg)", color: msg.role === "user" ? "var(--muted)" : "var(--accent)", border: msg.role === "user" ? "1px solid var(--line)" : "none" }}>
                   <Ico d={msg.role === "assistant" ? ICONS.ai : ICONS.user} size={13} sw={1.8} />
                 </div>
                 <div style={{ background: msg.role === "user" ? "var(--surface-soft)" : "transparent", border: msg.role === "user" ? "1px solid var(--line)" : "none", padding: msg.role === "user" ? "9px 13px" : "1px 0 0", borderRadius: msg.role === "user" ? "12px 2px 12px 12px" : 0, fontSize: 12, lineHeight: 1.75, color: "var(--text)", letterSpacing: "0.1px" }}>
@@ -800,7 +800,7 @@ export default function AITeacher() {
             {/* Loading indicator */}
             {loading && activeSessionId && (
               <div style={{ display: "flex", gap: 10, maxWidth: "92%", alignSelf: "flex-start" }}>
-                <div style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, display: "grid", placeItems: "center", background: "rgba(109,94,251,0.08)", color: "var(--accent)" }}>
+                <div style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, display: "grid", placeItems: "center", background: "var(--accent-soft-bg)", color: "var(--accent)" }}>
                   <Ico d={ICONS.ai} size={13} sw={1.8} />
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 0", fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>
@@ -825,7 +825,7 @@ export default function AITeacher() {
                 placeholder={booting ? "会话加载中..." : (!activeSessionId ? "请先新建会话" : "输入你的问题… (Enter 发送，Shift+Enter 换行)")}
                 style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 12, lineHeight: 1.65, color: "var(--text)", resize: "none", padding: 0, maxHeight: 100, minHeight: 32, fontFamily: "inherit" }}
               />
-              <button onClick={() => sendMessage(input)} disabled={booting || !activeSessionId || loading || !input.trim()} style={{ width: 30, height: 30, borderRadius: 8, background: (booting || !activeSessionId || loading || !input.trim()) ? "var(--line)" : "var(--accent)", color: "#fff", border: "none", display: "grid", placeItems: "center", cursor: (booting || !activeSessionId || loading || !input.trim()) ? "not-allowed" : "pointer", flexShrink: 0, transition: "background 0.2s", boxShadow: (booting || !activeSessionId || loading || !input.trim()) ? "none" : "0 2px 8px rgba(109,94,251,0.25)" }}>
+              <button onClick={() => sendMessage(input)} disabled={booting || !activeSessionId || loading || !input.trim()} style={{ width: 30, height: 30, borderRadius: 8, background: (booting || !activeSessionId || loading || !input.trim()) ? "var(--line)" : "var(--accent)", color: "#fff", border: "none", display: "grid", placeItems: "center", cursor: (booting || !activeSessionId || loading || !input.trim()) ? "not-allowed" : "pointer", flexShrink: 0, transition: "background 0.2s", boxShadow: (booting || !activeSessionId || loading || !input.trim()) ? "none" : "0 8px 18px rgba(15,23,42,0.08)" }}>
                 <Ico d={ICONS.send} size={13} col="#fff" sw={2} />
               </button>
             </div>

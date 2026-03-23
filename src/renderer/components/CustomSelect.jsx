@@ -97,7 +97,7 @@ export default function CustomSelect({
                   width: "100%",
                   padding: "9px 12px",
                   border: "none",
-                  background: active ? "rgba(109,94,251,0.1)" : "transparent",
+                  background: active ? "var(--accent-soft-bg)" : "transparent",
                   color: active ? "var(--accent)" : "var(--text)",
                   fontSize: 13,
                   textAlign: "left",

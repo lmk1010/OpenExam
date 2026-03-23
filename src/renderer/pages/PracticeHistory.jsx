@@ -87,7 +87,7 @@ export default function PracticeHistory({ onBack }) {
       {/* 统计卡片 */}
       <div className="history-stats">
         <div className="hs-card">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6d5efb" strokeWidth="2">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
           </svg>
           <div className="hs-data">
@@ -96,7 +96,7 @@ export default function PracticeHistory({ onBack }) {
           </div>
         </div>
         <div className="hs-card">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2">
             <polyline points="20 6 9 17 4 12"/>
           </svg>
           <div className="hs-data">
@@ -105,7 +105,7 @@ export default function PracticeHistory({ onBack }) {
           </div>
         </div>
         <div className="hs-card">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2">
             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
           </svg>
           <div className="hs-data">
@@ -130,8 +130,8 @@ export default function PracticeHistory({ onBack }) {
             <div key={record.id || idx} className="history-record">
               <div className="hr-left">
                 <div className="hr-icon" style={{
-                  background: record.accuracy >= 60 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                  color: record.accuracy >= 60 ? '#10b981' : '#ef4444'
+                  background: record.accuracy >= 60 ? 'var(--success-soft)' : 'var(--danger-soft)',
+                  color: record.accuracy >= 60 ? 'var(--success)' : 'var(--danger)'
                 }}>
                   {record.accuracy >= 60 ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -149,7 +149,7 @@ export default function PracticeHistory({ onBack }) {
                 </div>
               </div>
               <div className="hr-right">
-                <span className="hr-accuracy" style={{ color: record.accuracy >= 60 ? '#10b981' : '#ef4444' }}>
+                <span className="hr-accuracy" style={{ color: record.accuracy >= 60 ? 'var(--success)' : 'var(--danger)' }}>
                   {record.accuracy || 0}%
                 </span>
                 <span className="hr-score">{record.correct_count || 0}/{record.total_count || 0}</span>

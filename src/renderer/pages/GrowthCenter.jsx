@@ -19,12 +19,12 @@ const SectionHead = ({ icon, title, color = "var(--accent)", right }) => (
 
 // ─── Heatmap cell colors ──────────────────────────────────────────────────────
 const heatBg = lvl => [
-  "rgba(109,94,251,0.05)",
-  "rgba(109,94,251,0.18)",
-  "rgba(109,94,251,0.38)",
-  "rgba(109,94,251,0.62)",
-  "var(--accent)",
-][lvl] || "rgba(109,94,251,0.05)";
+  "var(--heatmap-level-0)",
+  "var(--heatmap-level-1)",
+  "var(--heatmap-level-2)",
+  "var(--heatmap-level-3)",
+  "var(--heatmap-level-4)",
+][lvl] || "var(--heatmap-level-0)";
 
 const formatHeatmapDate = (value) => {
   if (!value) return "最近 90 天";
@@ -40,7 +40,7 @@ const getHeatmapSummary = (cell) => {
       detail: "悬浮到方块上查看每天的学习情况",
       badge: "暂无数据",
       badgeColor: "var(--muted)",
-      badgeBg: "rgba(0,0,0,0.05)",
+      badgeBg: "var(--neutral-soft-bg)",
     };
   }
 
@@ -49,8 +49,8 @@ const getHeatmapSummary = (cell) => {
       label: formatHeatmapDate(cell.date),
       detail: `当天完成 ${cell.count} 题 · ${cell.sessions || 0} 次练习`,
       badge: "已学习",
-      badgeColor: "#00b894",
-      badgeBg: "rgba(0,184,148,0.1)",
+      badgeColor: "var(--success)",
+      badgeBg: "var(--success-soft)",
     };
   }
 
@@ -59,7 +59,7 @@ const getHeatmapSummary = (cell) => {
     detail: "当天暂无练习记录",
     badge: "未学习",
     badgeColor: "var(--muted)",
-    badgeBg: "rgba(0,0,0,0.05)",
+    badgeBg: "var(--neutral-soft-bg)",
   };
 };
 
@@ -128,7 +128,7 @@ export default function GrowthCenter({ onOpenAchievements }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <div style={{ fontSize: 11, color: "var(--muted)" }}>我的 › 成长中心</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, var(--accent) 0%, #3b28cc 100%)", display: "grid", placeItems: "center", color: "#fff", boxShadow: "0 3px 9px rgba(109,94,251,0.22)" }}>
+            <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%)", display: "grid", placeItems: "center", color: "#fff", boxShadow: "0 4px 12px rgba(15,23,42,0.12)" }}>
               <Ico d={ICONS.growth} size={13} col="#fff" sw={2} />
             </div>
             <h2 style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.3px", margin: 0 }}>我的成长</h2>
@@ -138,11 +138,11 @@ export default function GrowthCenter({ onOpenAchievements }) {
         {/* Header pills */}
         <div style={{ display: "flex", gap: 8 }}>
           {[
-            { label: "连续签到", val: `${d.streak}天`, color: d.streak >= 7 ? "#f39c12" : "var(--accent)", bg: d.streak >= 7 ? "rgba(243,156,18,0.08)" : "rgba(109,94,251,0.07)" },
-            { label: "今日目标", val: `${todayPct}%`, color: todayPct >= 100 ? "#00b894" : "var(--accent)", bg: todayPct >= 100 ? "rgba(0,184,148,0.08)" : "rgba(109,94,251,0.07)" },
-            { label: "正确率",   val: `${d.practiceStats.accuracy}%`, color: d.practiceStats.accuracy >= 80 ? "#00b894" : d.practiceStats.accuracy >= 60 ? "#f39c12" : "var(--text)", bg: "rgba(0,0,0,0.03)" },
+            { label: "连续签到", val: `${d.streak}天`, color: d.streak >= 7 ? "var(--warning)" : "var(--accent)", bg: d.streak >= 7 ? "var(--warning-soft)" : "var(--accent-soft-bg)", border: d.streak >= 7 ? "var(--warning-border)" : "var(--accent-border-soft)" },
+            { label: "今日目标", val: `${todayPct}%`, color: todayPct >= 100 ? "var(--success)" : "var(--accent)", bg: todayPct >= 100 ? "var(--success-soft)" : "var(--accent-soft-bg)", border: todayPct >= 100 ? "var(--success-border)" : "var(--accent-border-soft)" },
+            { label: "正确率",   val: `${d.practiceStats.accuracy}%`, color: d.practiceStats.accuracy >= 80 ? "var(--success)" : d.practiceStats.accuracy >= 60 ? "var(--warning)" : "var(--text)", bg: "var(--neutral-soft-bg)", border: d.practiceStats.accuracy >= 80 ? "var(--success-border)" : d.practiceStats.accuracy >= 60 ? "var(--warning-border)" : "rgba(148,163,184,0.18)" },
           ].map(p => (
-            <div key={p.label} style={{ display: "flex", alignItems: "center", gap: 6, background: p.bg, borderRadius: 16, padding: "4px 11px", border: `1px solid ${p.color}1a` }}>
+            <div key={p.label} style={{ display: "flex", alignItems: "center", gap: 6, background: p.bg, borderRadius: 16, padding: "4px 11px", border: `1px solid ${p.border}` }}>
               <span style={{ fontSize: 10, color: "var(--muted)" }}>{p.label}</span>
               <span style={{ fontSize: 12, fontWeight: 700, color: p.color, fontFamily: "monospace" }}>{p.val}</span>
             </div>
@@ -157,8 +157,8 @@ export default function GrowthCenter({ onOpenAchievements }) {
         <aside style={{ width: 210, flexShrink: 0, borderRight: "1px solid var(--line)", overflow: "auto", padding: "16px 16px 20px" }}>
 
           {/* Level card */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "16px 12px 18px", background: "rgba(109,94,251,0.04)", borderRadius: 12, border: "1px solid rgba(109,94,251,0.1)", marginBottom: 16 }}>
-            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg, var(--accent) 0%, #3b28cc 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 22, fontWeight: 800, boxShadow: "0 4px 14px rgba(109,94,251,0.3)" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "16px 12px 18px", background: "var(--accent-soft-bg)", borderRadius: 12, border: "1px solid var(--accent-border-soft)", marginBottom: 16 }}>
+            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 22, fontWeight: 800, boxShadow: "0 10px 22px rgba(15,23,42,0.16)" }}>
               {d.level}
             </div>
             <div style={{ textAlign: "center" }}>
@@ -171,7 +171,7 @@ export default function GrowthCenter({ onOpenAchievements }) {
                 <span>EXP</span>
                 <span style={{ fontFamily: "monospace" }}>{d.exp}/{d.maxExp}</span>
               </div>
-              <div style={{ height: 4, borderRadius: 4, background: "rgba(109,94,251,0.12)", overflow: "hidden" }}>
+              <div style={{ height: 4, borderRadius: 4, background: "var(--accent-soft-bg-strong)", overflow: "hidden" }}>
                 <div style={{ width: `${expPct}%`, height: "100%", background: "var(--accent)", borderRadius: 4, transition: "width 0.8s ease" }} />
               </div>
             </div>
@@ -179,12 +179,12 @@ export default function GrowthCenter({ onOpenAchievements }) {
 
           {/* Today's data */}
           <div style={{ marginBottom: 16 }}>
-            <SectionHead icon={ICONS.clock} title="今日数据" color="#1e78ff" />
+            <SectionHead icon={ICONS.clock} title="今日数据" color="var(--info)" />
             <div style={{ display: "flex", flexDirection: "column", gap: 0, marginTop: 8 }}>
               {[
                 { label: "做题量", val: d.today.total, unit: "道", icon: ICONS.book,    color: "var(--accent)" },
-                { label: "正确率", val: todayAccuracy !== null ? todayAccuracy + "%" : "--", unit: "", icon: ICONS.correct, color: "#00b894" },
-                { label: "学习时长", val: d.today.duration, unit: "分钟", icon: ICONS.clock,  color: "#f39c12" },
+                { label: "正确率", val: todayAccuracy !== null ? todayAccuracy + "%" : "--", unit: "", icon: ICONS.correct, color: "var(--success)" },
+                { label: "学习时长", val: d.today.duration, unit: "分钟", icon: ICONS.clock,  color: "var(--warning)" },
               ].map((row, i, arr) => (
                 <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: i < arr.length - 1 ? "1px dashed var(--line)" : "none" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -202,28 +202,28 @@ export default function GrowthCenter({ onOpenAchievements }) {
             <div style={{ marginTop: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>
                 <span>今日目标</span>
-                <span style={{ color: todayPct >= 100 ? "#00b894" : "var(--accent)", fontWeight: 600 }}>
+                <span style={{ color: todayPct >= 100 ? "var(--success)" : "var(--accent)", fontWeight: 600 }}>
                   {d.today.total}/{dailyGoal}
                   {todayPct >= 100 && " ✓"}
                 </span>
               </div>
-              <div style={{ height: 4, borderRadius: 4, background: "rgba(0,0,0,0.05)", overflow: "hidden" }}>
-                <div style={{ width: `${todayPct}%`, height: "100%", borderRadius: 4, background: todayPct >= 100 ? "#00b894" : "var(--accent)", transition: "width 0.8s ease" }} />
+              <div style={{ height: 4, borderRadius: 4, background: "var(--neutral-soft-bg)", overflow: "hidden" }}>
+                <div style={{ width: `${todayPct}%`, height: "100%", borderRadius: 4, background: todayPct >= 100 ? "var(--success)" : "var(--accent)", transition: "width 0.8s ease" }} />
               </div>
             </div>
           </div>
 
           {/* Cumulative stats */}
           <div style={{ marginBottom: 16 }}>
-            <SectionHead icon={ICONS.chart} title="累计数据" color="#00b894" />
+            <SectionHead icon={ICONS.chart} title="累计数据" color="var(--success)" />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
               {[
-                { label: "累计做题", val: d.practiceStats.totalDone, color: "var(--accent)", icon: ICONS.book },
-                { label: "正确解答", val: d.practiceStats.correctCount || 0, color: "#00b894", icon: ICONS.correct },
-                { label: "错误累计", val: d.practiceStats.wrongCount  || 0, color: "#e74c3c", icon: ICONS.wrong },
-                { label: "学习天数", val: studyDays, color: "#f39c12", icon: ICONS.days },
+                { label: "累计做题", val: d.practiceStats.totalDone, color: "var(--accent)", bg: "var(--accent-soft-bg)", border: "var(--accent-border-soft)", icon: ICONS.book },
+                { label: "正确解答", val: d.practiceStats.correctCount || 0, color: "var(--success)", bg: "var(--success-soft)", border: "var(--success-border)", icon: ICONS.correct },
+                { label: "错误累计", val: d.practiceStats.wrongCount  || 0, color: "var(--danger)", bg: "var(--danger-soft)", border: "var(--danger-border)", icon: ICONS.wrong },
+                { label: "学习天数", val: studyDays, color: "var(--warning)", bg: "var(--warning-soft)", border: "var(--warning-border)", icon: ICONS.days },
               ].map(item => (
-                <div key={item.label} style={{ display: "flex", flexDirection: "column", gap: 5, padding: "9px 10px", background: `${item.color}09`, borderRadius: 9, border: `1px solid ${item.color}18` }}>
+                <div key={item.label} style={{ display: "flex", flexDirection: "column", gap: 5, padding: "9px 10px", background: item.bg, borderRadius: 9, border: `1px solid ${item.border}` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                     <Ico d={item.icon} size={11} col={item.color} sw={2} />
                     <span style={{ fontSize: 9, color: "var(--muted)", fontWeight: 500 }}>{item.label}</span>
@@ -235,7 +235,7 @@ export default function GrowthCenter({ onOpenAchievements }) {
           </div>
 
           {/* AI suggestion */}
-          <div style={{ background: "rgba(109,94,251,0.04)", border: "1px dashed rgba(109,94,251,0.2)", borderRadius: 10, padding: "11px 12px" }}>
+          <div style={{ background: "var(--accent-soft-bg)", border: "1px dashed var(--accent-border-soft)", borderRadius: 10, padding: "11px 12px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 7 }}>
               <Ico d={ICONS.ai} size={11} col="var(--accent)" sw={2} />
               <span style={{ fontSize: 11, fontWeight: 600, color: "var(--accent)" }}>AI 建议</span>
@@ -261,7 +261,7 @@ export default function GrowthCenter({ onOpenAchievements }) {
 
               {/* Heatmap */}
               <div>
-                <SectionHead icon={ICONS.days} title="学习日历" color="#1e78ff"
+                <SectionHead icon={ICONS.days} title="学习日历" color="var(--info)"
                   right={<span style={{ fontSize: 10, color: "var(--muted)" }}>近 90 天</span>} />
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
                   <div style={{
@@ -272,7 +272,7 @@ export default function GrowthCenter({ onOpenAchievements }) {
                     padding: "10px 12px",
                     borderRadius: 10,
                     border: "1px solid var(--line)",
-                    background: "linear-gradient(180deg, rgba(109,94,251,0.05) 0%, rgba(109,94,251,0.02) 100%)",
+                    background: "linear-gradient(180deg, var(--accent-soft-bg-strong) 0%, var(--accent-soft-bg) 100%)",
                   }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>{heatmapSummary.label}</div>
@@ -301,8 +301,8 @@ export default function GrowthCenter({ onOpenAchievements }) {
                             borderRadius: 4,
                             background: heatBg(cell.level),
                             cursor: "pointer",
-                            border: isActive ? "1px solid rgba(109,94,251,0.55)" : "1px solid rgba(109,94,251,0.08)",
-                            boxShadow: isActive ? "0 8px 16px rgba(109,94,251,0.16)" : "none",
+                            border: isActive ? "1px solid var(--accent-border-soft)" : "1px solid rgba(148,163,184,0.14)",
+                            boxShadow: isActive ? "0 8px 16px rgba(15,23,42,0.14)" : "none",
                             transform: isActive ? "translateY(-1px)" : "none",
                             transition: "all 0.16s ease",
                             position: "relative",
@@ -319,7 +319,7 @@ export default function GrowthCenter({ onOpenAchievements }) {
                               width: 4,
                               height: 4,
                               borderRadius: "50%",
-                              background: "rgba(255,255,255,0.92)",
+                              background: "var(--heatmap-dot-bg)",
                             }} />
                           )}
                         </div>
@@ -342,7 +342,7 @@ export default function GrowthCenter({ onOpenAchievements }) {
 
               {/* Stage goals */}
               <div>
-                <SectionHead icon={ICONS.target} title="阶段目标" color="#f39c12" />
+                <SectionHead icon={ICONS.target} title="阶段目标" color="var(--warning)" />
                 <div style={{ display: "flex", flexDirection: "column", gap: 11, marginTop: 10 }}>
                   {overallGoals.map(goal => {
                     const pct  = goal.current >= goal.target ? 100 : goal.current > 0 ? Math.round((goal.current / goal.target) * 100) : 0;
@@ -351,12 +351,12 @@ export default function GrowthCenter({ onOpenAchievements }) {
                       <div key={goal.label}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4, fontSize: 11 }}>
                           <span style={{ color: done ? "var(--accent)" : "var(--text)", fontWeight: done ? 600 : 400 }}>{goal.label}</span>
-                          <span style={{ color: done ? "#00b894" : "var(--muted)", fontWeight: done ? 700 : 400, fontFamily: "monospace", fontSize: 10 }}>
+                          <span style={{ color: done ? "var(--success)" : "var(--muted)", fontWeight: done ? 700 : 400, fontFamily: "monospace", fontSize: 10 }}>
                             {done ? "✓ 完成" : `${pct}%`}
                           </span>
                         </div>
-                        <div style={{ height: 4, borderRadius: 4, background: "rgba(0,0,0,0.05)", overflow: "hidden" }}>
-                          <div style={{ width: `${pct}%`, height: "100%", background: done ? "#00b894" : "var(--accent)", borderRadius: 4, transition: "width 0.8s ease" }} />
+                        <div style={{ height: 4, borderRadius: 4, background: "var(--neutral-soft-bg)", overflow: "hidden" }}>
+                          <div style={{ width: `${pct}%`, height: "100%", background: done ? "var(--success)" : "var(--accent)", borderRadius: 4, transition: "width 0.8s ease" }} />
                         </div>
                       </div>
                     );
@@ -367,7 +367,7 @@ export default function GrowthCenter({ onOpenAchievements }) {
 
             {/* col 2 — achievements */}
             <div>
-              <SectionHead icon={ICONS.trophy} title="成就展柜" color="#f39c12"
+              <SectionHead icon={ICONS.trophy} title="成就展柜" color="var(--warning)"
                 right={<span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 600 }}>{unlockedCnt}/{achievements.length} 已解锁</span>} />
               <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
                 {selectedAchievement && (
@@ -395,8 +395,8 @@ export default function GrowthCenter({ onOpenAchievements }) {
                         <span style={{
                           fontSize: 9,
                           fontWeight: 700,
-                          color: selectedAchievement.unlocked ? "#00b894" : "var(--muted)",
-                          background: selectedAchievement.unlocked ? "rgba(0,184,148,0.08)" : "rgba(148,163,184,0.10)",
+                          color: selectedAchievement.unlocked ? "var(--success)" : "var(--muted)",
+                          background: selectedAchievement.unlocked ? "var(--success-soft)" : "var(--neutral-soft-bg)",
                           borderRadius: 999,
                           padding: "2px 6px",
                         }}>{selectedAchievement.unlocked ? "已解锁" : "待解锁"}</span>
@@ -408,7 +408,7 @@ export default function GrowthCenter({ onOpenAchievements }) {
                         })()}
                       </div>
                       <div style={{ fontSize: 10, color: "var(--muted)", lineHeight: 1.55, marginTop: 4 }}>{selectedAchievement.desc}</div>
-                      <div style={{ fontSize: 10, color: selectedAchievement.unlocked ? "#00b894" : "var(--accent)", marginTop: 5, fontWeight: 700 }}>{selectedAchievement.progressText}</div>
+                      <div style={{ fontSize: 10, color: selectedAchievement.unlocked ? "var(--success)" : "var(--accent)", marginTop: 5, fontWeight: 700 }}>{selectedAchievement.progressText}</div>
                     </div>
                   </button>
                 )}
@@ -442,8 +442,8 @@ export default function GrowthCenter({ onOpenAchievements }) {
                     style={{
                       height: 36,
                       borderRadius: 10,
-                      border: "1px solid rgba(109,94,251,0.16)",
-                      background: "rgba(109,94,251,0.05)",
+                      border: "1px solid var(--accent-border-soft)",
+                      background: "var(--accent-soft-bg)",
                       color: "var(--accent)",
                       fontSize: 11,
                       fontWeight: 600,

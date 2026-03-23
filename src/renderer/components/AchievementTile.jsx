@@ -12,8 +12,8 @@ export function AchievementRing({ achievement, size = 68, compact = false }) {
   const tierStyle = getAchievementTierStyle(achievement?.tier);
   const progress = Math.max(0, Math.min(1, achievement?.progressRatio || 0));
   const isUnlocked = Boolean(achievement?.unlocked);
-  const ringColor = isUnlocked ? '#00b894' : tierStyle.color;
-  const trackColor = isUnlocked ? 'rgba(0,184,148,0.12)' : 'rgba(109,94,251,0.10)';
+  const ringColor = isUnlocked ? 'var(--success)' : tierStyle.color;
+  const trackColor = isUnlocked ? 'var(--success-soft)' : 'var(--accent-soft-bg)';
   const strokeWidth = compact ? 4 : 5;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -26,7 +26,7 @@ export function AchievementRing({ achievement, size = 68, compact = false }) {
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={trackColor} strokeWidth={strokeWidth} />
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={ringColor} strokeWidth={strokeWidth} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} />
       </svg>
-      <div style={{ width: innerSize, height: innerSize, borderRadius: '50%', background: isUnlocked ? 'rgba(255,255,255,0.98)' : 'rgba(255,255,255,0.92)', border: `1px solid ${isUnlocked ? 'rgba(0,184,148,0.10)' : 'rgba(109,94,251,0.08)'}`, display: 'grid', placeItems: 'center', boxShadow: isUnlocked ? '0 8px 18px rgba(0,184,148,0.08)' : '0 6px 14px rgba(109,94,251,0.06)' }}>
+      <div style={{ width: innerSize, height: innerSize, borderRadius: '50%', background: isUnlocked ? 'var(--achievement-tile-inner-unlocked-bg)' : 'var(--achievement-tile-inner-locked-bg)', border: `1px solid ${isUnlocked ? 'var(--success-border)' : 'var(--accent-border-soft)'}`, display: 'grid', placeItems: 'center', boxShadow: isUnlocked ? '0 8px 18px rgba(46,168,134,0.10)' : '0 6px 14px rgba(15,23,42,0.08)' }}>
         <Ico d={getAchievementIcon(achievement)} size={compact ? 16 : 18} col={isUnlocked ? ringColor : 'var(--accent)'} sw={1.9} />
       </div>
     </div>
@@ -49,15 +49,15 @@ export default function AchievementTile({ achievement, compact = false, selected
         aspectRatio: '1 / 1',
         borderRadius: compact ? 14 : 16,
         border: selected
-          ? '1px solid rgba(109,94,251,0.16)'
+          ? '1px solid var(--accent-border-soft)'
           : isUnlocked
-            ? '1px solid rgba(109,94,251,0.05)'
+            ? '1px solid rgba(117,109,232,0.10)'
             : '1px solid rgba(148,163,184,0.10)',
         background: isUnlocked
-          ? 'linear-gradient(180deg, rgba(109,94,251,0.03) 0%, rgba(255,255,255,0.92) 100%)'
-          : 'linear-gradient(180deg, rgba(255,255,255,0.84) 0%, rgba(248,250,252,0.90) 100%)',
+          ? 'var(--achievement-tile-unlocked-bg)'
+          : 'var(--achievement-tile-locked-bg)',
         boxShadow: selected
-          ? '0 8px 18px rgba(109,94,251,0.08)'
+          ? '0 8px 18px rgba(15,23,42,0.08)'
           : '0 2px 8px rgba(15,23,42,0.03)',
         padding: compact ? '8px 8px 10px' : '10px 10px 12px',
         display: 'flex',
@@ -75,7 +75,7 @@ export default function AchievementTile({ achievement, compact = false, selected
         <span style={{ fontSize: 9, color: tierStyle.color, background: tierStyle.bg, border: `1px solid ${tierStyle.border}`, borderRadius: 999, padding: '2px 6px', fontWeight: 700 }}>
           {tierStyle.label}
         </span>
-        <span style={{ fontSize: 9, color: isUnlocked ? '#00b894' : 'var(--muted)', fontWeight: 700, opacity: isUnlocked ? 1 : 0.8 }}>
+        <span style={{ fontSize: 9, color: isUnlocked ? 'var(--success)' : 'var(--muted)', fontWeight: 700, opacity: isUnlocked ? 1 : 0.8 }}>
           {isUnlocked ? '已解锁' : `${progressPercent}%`}
         </span>
       </div>
@@ -94,7 +94,7 @@ export default function AchievementTile({ achievement, compact = false, selected
       </div>
 
       <div style={{ width: '100%', marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: isUnlocked ? '#00b894' : 'var(--accent)', ...lineClamp(1) }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: isUnlocked ? 'var(--success)' : 'var(--accent)', ...lineClamp(1) }}>
           {achievement?.progressText || (isUnlocked ? '已完成' : '进行中')}
         </div>
       </div>

@@ -28,7 +28,7 @@ const DECOR_KEYS = Object.keys(DECORS);
 const hashString = (value = '') => Array.from(value).reduce((sum, ch) => ((sum * 31) + ch.charCodeAt(0)) >>> 0, 7);
 
 export const ACH_GROUP_LABELS = { growth: '刷题里程', habit: '习惯养成', accuracy: '准确效率', mastery: '深度掌握', explore: '进阶探索' };
-export const ACH_TIER_STYLES = { bronze: { label: '青铜', color: '#b7791f', bg: 'rgba(183,121,31,0.12)', border: 'rgba(183,121,31,0.2)' }, silver: { label: '白银', color: '#718096', bg: 'rgba(113,128,150,0.12)', border: 'rgba(113,128,150,0.2)' }, gold: { label: '黄金', color: '#d69e2e', bg: 'rgba(214,158,46,0.12)', border: 'rgba(214,158,46,0.22)' }, master: { label: '大师', color: '#6d5efb', bg: 'rgba(109,94,251,0.12)', border: 'rgba(109,94,251,0.2)' } };
+export const ACH_TIER_STYLES = { bronze: { label: '青铜', color: '#b88449', bg: 'rgba(184,132,73,0.12)', border: 'rgba(184,132,73,0.2)' }, silver: { label: '白银', color: '#7f8a9d', bg: 'rgba(127,138,157,0.12)', border: 'rgba(127,138,157,0.2)' }, gold: { label: '黄金', color: '#c89b53', bg: 'rgba(200,155,83,0.12)', border: 'rgba(200,155,83,0.2)' }, master: { label: '大师', color: 'var(--accent)', bg: 'var(--accent-soft-bg)', border: 'var(--accent-border-soft)' } };
 
 export const getAchievementTierStyle = (tier) => ACH_TIER_STYLES[tier] || ACH_TIER_STYLES.bronze;
 export const getAchievementGroupLabel = (group) => ACH_GROUP_LABELS[group] || '成长成就';

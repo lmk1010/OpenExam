@@ -20,9 +20,9 @@ const GROUP_ICONS = {
 
 const cardStyle = {
   borderRadius: 16,
-  border: '1px solid var(--line)',
-  background: 'var(--surface)',
-  boxShadow: '0 10px 28px rgba(15, 23, 42, 0.04)',
+  border: '1px solid var(--surface-border-strong)',
+  background: 'var(--surface-elevated)',
+  boxShadow: 'var(--elevated-shadow)',
 };
 
 const compactText = {
@@ -118,7 +118,7 @@ export default function AchievementCenter({ onBack }) {
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>我的 › 成长中心 › 成就列表</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, minWidth: 0 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #f59e0b 0%, #f97316 100%)', display: 'grid', placeItems: 'center', color: '#fff', flexShrink: 0 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, var(--warning) 0%, #d8ad69 100%)', display: 'grid', placeItems: 'center', color: '#fff', flexShrink: 0 }}>
                 <Ico d={ICONS.trophy} size={14} col="#fff" sw={2} />
               </div>
               <div style={{ minWidth: 0 }}>
@@ -139,8 +139,8 @@ export default function AchievementCenter({ onBack }) {
                 height: 32,
                 padding: '0 12px',
                 borderRadius: 999,
-                border: filter === item.key ? '1px solid rgba(109,94,251,0.24)' : '1px solid var(--line)',
-                background: filter === item.key ? 'rgba(109,94,251,0.08)' : 'var(--surface)',
+                border: filter === item.key ? '1px solid var(--accent-border-soft)' : '1px solid var(--line)',
+                background: filter === item.key ? 'var(--accent-soft-bg)' : 'var(--surface)',
                 color: filter === item.key ? 'var(--accent)' : 'var(--muted)',
                 fontSize: 11,
                 fontWeight: 700,
@@ -163,18 +163,18 @@ export default function AchievementCenter({ onBack }) {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>总体进度</span>
-                <span style={{ fontSize: 10, color: 'var(--accent)', background: 'rgba(109,94,251,0.08)', borderRadius: 999, padding: '2px 8px', fontWeight: 700 }}>
+                <span style={{ fontSize: 10, color: 'var(--accent)', background: 'var(--accent-soft-bg)', borderRadius: 999, padding: '2px 8px', fontWeight: 700 }}>
                   完成度 {completionRate}%
                 </span>
               </div>
 
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
                 {[
-                  { label: '总成就', value: achievements.length, color: 'var(--accent)' },
-                  { label: '已解锁', value: unlockedCount, color: '#00b894' },
-                  { label: '待完成', value: lockedCount, color: '#64748b' },
+                  { label: '总成就', value: achievements.length, color: 'var(--accent)', bg: 'var(--accent-soft-bg)', border: 'var(--accent-border-soft)' },
+                  { label: '已解锁', value: unlockedCount, color: 'var(--success)', bg: 'var(--success-soft)', border: 'var(--success-border)' },
+                  { label: '待完成', value: lockedCount, color: 'var(--muted)', bg: 'var(--neutral-soft-bg)', border: 'rgba(148,163,184,0.18)' },
                 ].map((item) => (
-                  <div key={item.label} style={{ padding: '8px 10px', borderRadius: 12, background: `${item.color}08`, border: `1px solid ${item.color}16`, minWidth: 88 }}>
+                  <div key={item.label} style={{ padding: '8px 10px', borderRadius: 12, background: item.bg, border: `1px solid ${item.border}`, minWidth: 88 }}>
                     <div style={{ ...compactText }}>{item.label}</div>
                     <div style={{ fontSize: 16, fontWeight: 800, color: item.color, marginTop: 3 }}>{item.value}</div>
                   </div>
@@ -186,13 +186,13 @@ export default function AchievementCenter({ onBack }) {
                   <span>整体完成度</span>
                   <span>{completionRate}%</span>
                 </div>
-                <div style={{ height: 8, borderRadius: 999, background: 'rgba(109,94,251,0.08)', overflow: 'hidden' }}>
-                  <div style={{ width: `${completionRate}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, var(--accent), #8b7dfc)' }} />
+                <div style={{ height: 8, borderRadius: 999, background: 'var(--accent-soft-bg)', overflow: 'hidden' }}>
+                  <div style={{ width: `${completionRate}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, var(--accent), var(--accent-strong))' }} />
                 </div>
               </div>
             </div>
 
-            <div style={{ padding: '12px 12px 12px 14px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(109,94,251,0.08) 0%, rgba(109,94,251,0.03) 100%)', border: '1px solid rgba(109,94,251,0.14)' }}>
+            <div style={{ padding: '12px 12px 12px 14px', borderRadius: 16, background: 'linear-gradient(135deg, var(--accent-soft-bg-strong) 0%, var(--accent-soft-bg) 100%)', border: '1px solid var(--accent-border-soft)' }}>
               <div style={{ ...compactText }}>最近冲刺目标</div>
               {nextUnlock ? (
                 <button type="button" onClick={() => setDetailAchievementId(nextUnlock.id)} style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10, width: '100%', padding: 0, border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer' }}>
@@ -219,7 +219,7 @@ export default function AchievementCenter({ onBack }) {
               <section key={group.key} style={{ ...cardStyle, padding: '12px 14px 14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                    <div style={{ width: 26, height: 26, borderRadius: 8, background: 'rgba(109,94,251,0.08)', display: 'grid', placeItems: 'center' }}>
+                    <div style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--accent-soft-bg)', display: 'grid', placeItems: 'center' }}>
                       <Ico d={GROUP_ICONS[group.key] || ICONS.growth} size={12} col="var(--accent)" sw={2} />
                     </div>
                     <div>
@@ -228,8 +228,8 @@ export default function AchievementCenter({ onBack }) {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 132 }}>
-                    <div style={{ flex: 1, height: 6, borderRadius: 999, background: 'rgba(109,94,251,0.08)', overflow: 'hidden' }}>
-                      <div style={{ width: `${groupRate}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, var(--accent), #8b7dfc)' }} />
+                    <div style={{ flex: 1, height: 6, borderRadius: 999, background: 'var(--accent-soft-bg)', overflow: 'hidden' }}>
+                      <div style={{ width: `${groupRate}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, var(--accent), var(--accent-strong))' }} />
                     </div>
                     <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>{groupRate}%</span>
                   </div>

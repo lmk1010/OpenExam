@@ -10,7 +10,7 @@ const STEPS = [
       "支持题库练习、模拟考试、AI 出卷、错题复盘",
       "可随时跳过，不影响正常使用",
     ],
-    accent: "#6d5efb",
+    accent: "var(--accent)",
   },
   {
     id: "practice",
@@ -21,7 +21,7 @@ const STEPS = [
       "支持做题模式与背题模式",
       "交卷后自动记录练习表现",
     ],
-    accent: "#1e78ff",
+    accent: "var(--info)",
     cta: { label: "打开题库练习", page: "practice", tab: "题库练习" },
   },
   {
@@ -33,7 +33,7 @@ const STEPS = [
       "AI 出卷结果可一键保存进题库",
       "导入后即可直接练习与考试",
     ],
-    accent: "#00b894",
+    accent: "var(--success)",
     cta: { label: "打开 AI 出卷", page: "ai-generate", tab: "AI出卷" },
   },
   {
@@ -45,7 +45,7 @@ const STEPS = [
       "分析报告可生成个性化 7 天计划",
       "AI 老师可结合当前题目上下文讲解",
     ],
-    accent: "#f39c12",
+    accent: "var(--warning)",
     cta: { label: "前往系统设置", page: "settings", tab: "" },
   },
 ];

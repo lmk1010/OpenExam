@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { getAchievementGroupLabel, getAchievementTierStyle } from './AchievementVisuals.jsx';
 import { AchievementRing } from './AchievementTile.jsx';
 
-const card = { borderRadius: 14, padding: '10px 12px', background: 'rgba(248,250,252,0.9)', border: '1px solid rgba(148,163,184,0.12)' };
+const card = { borderRadius: 14, padding: '10px 12px', background: 'var(--surface-overlay-soft)', border: '1px solid var(--surface-border-strong)' };
 
 export default function AchievementDialog({ achievement, onClose }) {
   useEffect(() => {
@@ -16,20 +16,20 @@ export default function AchievementDialog({ achievement, onClose }) {
 
   const tierStyle = getAchievementTierStyle(achievement.tier);
   const progressPercent = Math.round((achievement.progressRatio || 0) * 100);
-  const statusColor = achievement.unlocked ? '#00b894' : 'var(--accent)';
+  const statusColor = achievement.unlocked ? 'var(--success)' : 'var(--accent)';
 
   return (
     <div role="dialog" aria-modal="true" onClick={() => onClose?.()} style={{ position: 'fixed', inset: 0, zIndex: 3200, background: 'rgba(15,23,42,0.44)', backdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', padding: 18 }}>
-      <div onClick={(event) => event.stopPropagation()} style={{ width: 'min(580px, calc(100vw - 24px))', borderRadius: 24, background: 'rgba(255,255,255,0.96)', border: '1px solid rgba(255,255,255,0.78)', boxShadow: '0 28px 90px rgba(15,23,42,0.22)', overflow: 'hidden' }}>
+      <div onClick={(event) => event.stopPropagation()} style={{ width: 'min(580px, calc(100vw - 24px))', borderRadius: 24, background: 'var(--surface-overlay)', border: '1px solid var(--surface-border-strong)', boxShadow: 'var(--elevated-shadow)', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '16px 18px 14px', borderBottom: '1px solid rgba(148,163,184,0.16)' }}>
           <div><div style={{ fontSize: 11, color: 'var(--muted)' }}>成就详情</div><div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', marginTop: 2 }}>{achievement.name}</div></div>
-          <button type="button" onClick={() => onClose?.()} style={{ width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(148,163,184,0.16)', background: 'rgba(248,250,252,0.9)', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>×</button>
+          <button type="button" onClick={() => onClose?.()} style={{ width: 34, height: 34, borderRadius: 10, border: '1px solid var(--surface-border-strong)', background: 'var(--surface-overlay-soft)', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>×</button>
         </div>
 
         <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start', padding: 18 }}>
           <div style={{ width: 116, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
             <AchievementRing achievement={achievement} size={96} />
-            <div style={{ padding: '4px 10px', borderRadius: 999, background: achievement.unlocked ? 'rgba(0,184,148,0.1)' : 'rgba(109,94,251,0.08)', color: statusColor, fontSize: 11, fontWeight: 800 }}>
+            <div style={{ padding: '4px 10px', borderRadius: 999, background: achievement.unlocked ? 'var(--success-soft)' : 'var(--accent-soft-bg)', color: statusColor, fontSize: 11, fontWeight: 800 }}>
               {achievement.unlocked ? '已解锁' : '解锁中'}
             </div>
           </div>
@@ -37,8 +37,8 @@ export default function AchievementDialog({ achievement, onClose }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: tierStyle.color, background: tierStyle.bg, border: `1px solid ${tierStyle.border}`, borderRadius: 999, padding: '3px 8px' }}>{tierStyle.label}</span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', background: 'rgba(109,94,251,0.08)', borderRadius: 999, padding: '3px 8px' }}>{getAchievementGroupLabel(achievement.group)}</span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: statusColor, background: achievement.unlocked ? 'rgba(0,184,148,0.08)' : 'rgba(109,94,251,0.08)', borderRadius: 999, padding: '3px 8px' }}>完成度 {progressPercent}%</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', background: 'var(--accent-soft-bg)', borderRadius: 999, padding: '3px 8px' }}>{getAchievementGroupLabel(achievement.group)}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: statusColor, background: achievement.unlocked ? 'var(--success-soft)' : 'var(--accent-soft-bg)', borderRadius: 999, padding: '3px 8px' }}>完成度 {progressPercent}%</span>
             </div>
 
             <div style={{ marginTop: 12, fontSize: 13, lineHeight: 1.7, color: 'var(--text)' }}>{achievement.desc}</div>
@@ -48,9 +48,9 @@ export default function AchievementDialog({ achievement, onClose }) {
               <div style={card}><div style={{ fontSize: 11, color: 'var(--muted)' }}>当前状态</div><div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)', marginTop: 4 }}>{achievement.unlocked ? '已完成，可继续挑战更高阶成就' : '继续练习，达成后自动解锁'}</div></div>
             </div>
 
-            <div style={{ ...card, marginTop: 12, background: 'linear-gradient(180deg, rgba(109,94,251,0.04) 0%, rgba(255,255,255,0.95) 100%)' }}>
+            <div style={{ ...card, marginTop: 12, background: 'var(--achievement-dialog-progress-bg)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}><span style={{ fontSize: 11, color: 'var(--muted)' }}>解锁进度</span><span style={{ fontSize: 12, fontWeight: 800, color: statusColor }}>{progressPercent}%</span></div>
-              <div style={{ height: 7, borderRadius: 999, background: 'rgba(109,94,251,0.08)', overflow: 'hidden', marginTop: 8 }}><div style={{ width: `${progressPercent}%`, height: '100%', borderRadius: 999, background: achievement.unlocked ? 'linear-gradient(90deg, #00b894, #20c997)' : 'linear-gradient(90deg, var(--accent), #8b7dfc)' }} /></div>
+              <div style={{ height: 7, borderRadius: 999, background: 'var(--accent-soft-bg)', overflow: 'hidden', marginTop: 8 }}><div style={{ width: `${progressPercent}%`, height: '100%', borderRadius: 999, background: achievement.unlocked ? 'var(--success)' : 'linear-gradient(90deg, var(--accent), var(--accent-strong))' }} /></div>
             </div>
           </div>
         </div>

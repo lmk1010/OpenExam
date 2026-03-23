@@ -3,11 +3,11 @@ import * as XLSX from 'xlsx';
 import { getAISettings, isAIConfigured, isOCRConfigured } from '../store/aiSettings.js';
 
 const categoryConfig = {
-  yanyu: { name: '言语理解', color: '#3b82f6' },
-  shuliang: { name: '数量关系', color: '#ec4899' },
-  panduan: { name: '判断推理', color: '#8b5cf6' },
-  ziliao: { name: '资料分析', color: '#f59e0b' },
-  changshi: { name: '常识判断', color: '#10b981' },
+  yanyu: { name: '言语理解', color: 'var(--category-yanyu)' },
+  shuliang: { name: '数量关系', color: 'var(--category-shuliang)' },
+  panduan: { name: '判断推理', color: 'var(--category-panduan)' },
+  ziliao: { name: '资料分析', color: 'var(--category-ziliao)' },
+  changshi: { name: '常识判断', color: 'var(--category-changshi)' },
 };
 
 // 子分类配置

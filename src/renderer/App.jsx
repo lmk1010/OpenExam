@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import PaperList from "./pages/PaperList.jsx";
 import PracticeModule from "./pages/PracticeModule.jsx";
 import PracticeHistory from "./pages/PracticeHistory.jsx";
@@ -87,12 +87,12 @@ const DynamicChart = ({ data, onHover }) => {
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
         <defs>
           <linearGradient id="dcLine" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0%" stopColor="#6d5efb" stopOpacity="0.65"/>
-            <stop offset="100%" stopColor="#8b7dfc" stopOpacity="1"/>
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.72"/>
+            <stop offset="100%" stopColor="var(--accent-strong)" stopOpacity="0.98"/>
           </linearGradient>
           <linearGradient id="dcArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#6d5efb" stopOpacity="0.16"/>
-            <stop offset="100%" stopColor="#6d5efb" stopOpacity="0"/>
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.14"/>
+            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0"/>
           </linearGradient>
         </defs>
 
@@ -119,7 +119,7 @@ const DynamicChart = ({ data, onHover }) => {
         {pts[activeIdx] && (
           <line x1={pts[activeIdx].x.toFixed(1)} y1={PAD_T}
             x2={pts[activeIdx].x.toFixed(1)} y2={bottomY}
-            stroke="#6d5efb" strokeWidth="1" strokeDasharray="3,3" opacity="0.3"/>
+            stroke="var(--accent)" strokeWidth="1" strokeDasharray="3,3" opacity="0.28"/>
         )}
 
         {/* hover 触发热区 */}
@@ -144,9 +144,9 @@ const DynamicChart = ({ data, onHover }) => {
             transform: 'translate(-50%, -50%)',
             width: active ? 10 : 6, height: active ? 10 : 6,
             borderRadius: '50%',
-            background: active ? '#fff' : 'rgba(109,94,251,0.7)',
-            border: active ? '2.5px solid #6d5efb' : 'none',
-            boxShadow: active ? '0 0 0 3px rgba(109,94,251,0.15), 0 2px 8px rgba(109,94,251,0.3)' : 'none',
+            background: active ? 'var(--surface-elevated)' : 'var(--accent)',
+            border: active ? '2.5px solid var(--accent)' : 'none',
+            boxShadow: active ? '0 0 0 3px var(--accent-soft-bg-strong), 0 4px 10px rgba(15,23,42,0.16)' : 'none',
             transition: 'all 0.15s ease',
           }}/>
         );
@@ -168,6 +168,8 @@ export default function App() {
   const [practiceConfig, setPracticeConfig] = useState(null); // 练习配置
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -199,6 +201,27 @@ export default function App() {
       setShowOnboarding(true);
     }
   }, []);
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setUserMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setUserMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    setUserMenuOpen(false);
+  }, [page]);
 
   const finishOnboarding = () => {
     try {
@@ -334,6 +357,12 @@ export default function App() {
     setPage(tabPageMap[tab] || "home");
   };
 
+  const handleUserMenuNavigate = (nextPage, nextTab) => {
+    if (typeof nextTab === 'string' && nextTab) setActiveTab(nextTab);
+    setPage(nextPage);
+    setUserMenuOpen(false);
+  };
+
   // 考试模式全屏
   if (page === "exam" && currentPaperId) {
     return (
@@ -448,17 +477,57 @@ export default function App() {
               </button>
               <div className="header-divider"></div>
               <div className="user">
-                <span className="user-name">考生用户</span>
-                <div className="avatar-wrap">
-                  <div className="avatar" />
-                  <svg className="avatar-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M7 10l5 5 5-5z"/>
-                  </svg>
+                <div className="user-menu-host" ref={userMenuRef}>
+                  <button
+                    className="user-trigger"
+                    type="button"
+                    onClick={() => setUserMenuOpen((open) => !open)}
+                    aria-expanded={userMenuOpen}
+                  >
+                    <span className="user-name">考生用户</span>
+                    <div className="avatar-wrap">
+                      <div className="avatar">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 21a8 8 0 0 0-16 0"/>
+                          <circle cx="12" cy="8" r="4"/>
+                        </svg>
+                      </div>
+                      <svg className="avatar-arrow" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7 10l5 5 5-5z"/>
+                      </svg>
+                    </div>
+                  </button>
+
+                  {userMenuOpen && (
+                    <div className="user-menu">
+                      <div className="user-menu-head">
+                        <div className="user-menu-avatar">考</div>
+                        <div>
+                          <div className="user-menu-title">考生用户</div>
+                          <div className="user-menu-subtitle">本地学习账户</div>
+                        </div>
+                      </div>
+                      <button type="button" className="user-menu-item" onClick={() => handleUserMenuNavigate("home", "学习中心")}>学习中心</button>
+                      <button type="button" className="user-menu-item" onClick={() => handleUserMenuNavigate("growth", "我的成长")}>我的成长</button>
+                      <button type="button" className="user-menu-item" onClick={() => handleUserMenuNavigate("achievements", "我的成长")}>成就列表</button>
+                      <button
+                        type="button"
+                        className="user-menu-item"
+                        onClick={() => {
+                          setTheme(theme === "light" ? "dark" : "light");
+                          setUserMenuOpen(false);
+                        }}
+                      >
+                        {theme === "light" ? "切换深色模式" : "切换浅色模式"}
+                      </button>
+                      <button type="button" className="user-menu-item danger" onClick={() => handleUserMenuNavigate("settings")}>系统设置</button>
+                    </div>
+                  )}
                 </div>
                 <button className="theme-toggle" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
                   {theme === "light" ? "☾" : "☀"}
                 </button>
-                <button className="settings-btn" onClick={() => setPage("settings")}>
+                <button className="settings-btn" onClick={() => setPage("settings")}> 
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                   </svg>
@@ -562,7 +631,7 @@ function OriginalHomePage() {
           <div className="breadcrumb" style={{ margin: 0, fontSize: 11, color: "var(--muted)" }}>学习中心 &gt; 行测专项</div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--line)", paddingBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(109,94,251,0.1)", display: "grid", placeItems: "center", color: "var(--accent)" }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: "var(--accent-soft-bg)", display: "grid", placeItems: "center", color: "var(--accent)" }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
               </div>
               <h2 style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.3px", margin: 0 }}>公考刷题</h2>
@@ -606,7 +675,7 @@ function OriginalHomePage() {
                   {yTicks.map((v, i) => <span key={i}>{v > 0 ? v + '题' : '0'}</span>)}
                 </div>
                 <div
-                  style={{ flex: 1, position: "relative", background: "rgba(109,94,251,0.02)", borderRadius: 12, border: "1px solid rgba(109,94,251,0.08)" }}
+                  style={{ flex: 1, position: "relative", background: "var(--accent-soft-bg)", borderRadius: 12, border: "1px solid var(--accent-border-soft)" }}
                   onMouseLeave={() => setHoverDay(null)}
                 >
                   <DynamicChart data={dailyStats} onHover={setHoverDay} />
@@ -630,7 +699,7 @@ function OriginalHomePage() {
             
             <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
                {/* Donut replacement */}
-               <div style={{ width: 100, height: 100, borderRadius: "50%", position: "relative", background: "conic-gradient(var(--accent) 0deg 210deg, rgba(109, 94, 251, 0.4) 210deg 280deg, rgba(109, 94, 251, 0.15) 280deg 360deg)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+               <div style={{ width: 100, height: 100, borderRadius: "50%", position: "relative", background: "conic-gradient(var(--accent) 0deg 210deg, var(--accent-soft-bg-strong) 210deg 280deg, var(--accent-soft-bg) 280deg 360deg)", display: "grid", placeItems: "center", flexShrink: 0 }}>
                  <div style={{ width: 70, height: 70, borderRadius: "50%", background: "var(--surface)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                     <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1 }}>{totalQuestions.toLocaleString()}</span>
                     <span style={{ fontSize: 9, color: "var(--muted)", marginTop: 4 }}>总题数</span>
@@ -640,7 +709,7 @@ function OriginalHomePage() {
                <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
                  {categories.slice(0, 3).map((cat, idx) => (
                    <div key={cat.category} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                     <span style={{ width: 60, height: 4, borderRadius: 2, background: idx === 0 ? "var(--accent)" : idx === 1 ? "rgba(109,94,251,0.5)" : "rgba(109,94,251,0.2)" }} />
+                     <span style={{ width: 60, height: 4, borderRadius: 2, background: idx === 0 ? "var(--accent)" : idx === 1 ? "var(--accent-soft-bg-strong)" : "var(--accent-soft-bg)" }} />
                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                        <span style={{ fontSize: 10, color: "var(--muted)" }}>{categoryNames[cat.category] || cat.category}</span>
                        <span style={{ fontSize: 12, fontWeight: 600 }}>{cat.total.toLocaleString()} <span style={{ fontSize: 10, fontWeight: 400, color: "var(--muted)" }}>道</span></span>
@@ -665,7 +734,7 @@ function OriginalHomePage() {
                 <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 6 }}>综合正确率</span>
               </div>
               
-              <div style={{ width: "100%", height: 6, borderRadius: 3, background: "rgba(109,94,251,0.15)", overflow: "hidden" }}>
+              <div style={{ width: "100%", height: 6, borderRadius: 3, background: "var(--accent-soft-bg-strong)", overflow: "hidden" }}>
                 <div style={{ width: `${stats.accuracy}%`, height: "100%", background: "var(--accent)", borderRadius: 3 }} />
               </div>
               
@@ -680,7 +749,7 @@ function OriginalHomePage() {
                 
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text)" }}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(109,94,251,0.2)" }} /> 
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--danger-soft)" }} /> 
                     <span>待加强 (错误)</span>
                   </div>
                   <strong style={{ fontSize: 14, marginRight: 14 }}>{stats.wrongCount.toLocaleString()} <span style={{ fontSize: 10, fontWeight: 400, color: "var(--muted)" }}>道</span></strong>
@@ -700,7 +769,7 @@ function OriginalHomePage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <h4 style={{ fontSize: 13, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19c2.5-2 2.5-5 0-8-1-1.5-2-2-2-4 0 0-2 2-2 4a3 3 0 00-3-3c0 2-2 4-2 6 0 3 2.5 6 5 6zm-5-3v-3"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19c2.5-2 2.5-5 0-8-1-1.5-2-2-2-4 0 0-2 2-2 4a3 3 0 00-3-3c0 2-2 4-2 6 0 3 2.5 6 5 6zm-5-3v-3"/></svg>
               热门题库
             </h4>
             <span style={{ fontSize: 11, color: "var(--accent)", cursor: "pointer", fontWeight: 500 }}>全部 {categories.length} &gt;</span>
@@ -709,7 +778,7 @@ function OriginalHomePage() {
             {categories.map((cat, i) => {
               const pct = cat.total > 0 ? Math.round(((cat.done || 0) / cat.total) * 100) : 0;
               const isTop = i < 3;
-              const rankColor = i === 0 ? "#f39c12" : i === 1 ? "#95a5a6" : i === 2 ? "#d35400" : "var(--muted)";
+              const rankColor = i === 0 ? "var(--warning)" : i === 1 ? "#98a3b6" : i === 2 ? "#bf8b5d" : "var(--muted)";
               
               return (
                 <div key={cat.category} style={{ 
@@ -728,7 +797,7 @@ function OriginalHomePage() {
 
                   <div style={{ 
                     width: 32, height: 32, borderRadius: 8, 
-                    background: "rgba(109,94,251,0.06)", 
+                    background: "var(--accent-soft-bg)", 
                     color: "var(--accent)",
                     display: "grid", placeItems: "center", flexShrink: 0
                   }}>
@@ -746,8 +815,8 @@ function OriginalHomePage() {
                     </div>
                     
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ flex: 1, height: 4, borderRadius: 2, background: "rgba(109,94,251,0.1)", overflow: "hidden" }}>
-                        <div style={{ width: `${pct}%`, height: "100%", background: i === 0 ? "var(--accent)" : "rgba(109,94,251,0.5)", borderRadius: 2 }} />
+                      <div style={{ flex: 1, height: 4, borderRadius: 2, background: "var(--accent-soft-bg-strong)", overflow: "hidden" }}>
+                        <div style={{ width: `${pct}%`, height: "100%", background: i === 0 ? "var(--accent)" : "var(--accent-strong)", borderRadius: 2 }} />
                       </div>
                       <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 600, minWidth: 26, textAlign: "right" }}>{pct}%</span>
                     </div>
@@ -775,7 +844,7 @@ function OriginalHomePage() {
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-               <span style={{ fontSize: 11, color: "#00b894", fontWeight: 600, background: "rgba(0,184,148,0.1)", padding: "2px 6px", borderRadius: 4 }}>+{stats.accuracy}% 正确</span>
+               <span style={{ fontSize: 11, color: "var(--success)", fontWeight: 600, background: "var(--success-soft)", padding: "2px 6px", borderRadius: 4 }}>+{stats.accuracy}% 正确</span>
             </div>
           </div>
         </div>
@@ -788,10 +857,10 @@ function OriginalHomePage() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, paddingTop: 4 }}>
             {[
-              { label: "今日新增", val: stats.todayAdded || 0, icon: <I d={<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></>} />, color: "#1e78ff" },
-              { label: "今日已练", val: stats.totalDone, icon: <I d={<><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></>} />, color: "#f39c12" },
-              { label: "正确题数", val: stats.correctCount, icon: <I d={<><polyline points="20 6 9 17 4 12"/></>} />, color: "#00b894" },
-              { label: "错题数", val: stats.wrongCount, icon: <I d={<><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6m0-6l6 6"/></>} />, color: "#e74c3c" },
+              { label: "今日新增", val: stats.todayAdded || 0, icon: <I d={<><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></>} />, color: "var(--info)" },
+              { label: "今日已练", val: stats.totalDone, icon: <I d={<><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></>} />, color: "var(--warning)" },
+              { label: "正确题数", val: stats.correctCount, icon: <I d={<><polyline points="20 6 9 17 4 12"/></>} />, color: "var(--success)" },
+              { label: "错题数", val: stats.wrongCount, icon: <I d={<><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6m0-6l6 6"/></>} />, color: "var(--danger)" },
             ].map((item, i) => (
               <div key={item.label} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

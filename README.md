@@ -22,7 +22,7 @@
 
 ## 产品概览
 
-OpenExam 是一个基于 `Electron + React + SQLite` 的桌面端学习平台，面向考公、考证、刷题训练与 AI 辅导场景，提供从题库导入、智能组卷、答题分析到成长追踪的一体化学习链路。
+OpenExam 是一个基于 `Electron + React + SQLite` 的桌面端学习平台，面向考公、考证、刷题训练与 AI 辅导场景，提供从题库导入、智能组卷、答题分析到成长追踪的一体化学习链路。官方题库以压缩 `SQLite` 种子库内置到应用中，首启自动初始化到本地用户目录，兼顾离线可用与后续扩展。
 
 ## 界面预览
 
@@ -54,6 +54,14 @@ OpenExam 是一个基于 `Electron + React + SQLite` 的桌面端学习平台，
 | 状态与数据 | 本地 Store + Renderer 页面状态 |
 | AI 模型 | OpenAI / Claude / DeepSeek / 豆包 / Kimi / 通义千问 / 智谱 GLM |
 
+## 题库架构
+
+- `官方题库`：仓库内保存压缩种子库 `data/openexam.seed.db.gz`，不再维护超大总 JSON。
+- `首启初始化`：应用首次启动时自动解压种子库到用户目录 `openexam.db`。
+- `题图离线化`：题图单独存放在 `question-assets/`，题目 HTML 中引用 `openexam-asset://question-assets/...`。
+- `本地解析`：Electron 主进程负责把资源协议映射到本地文件，开发环境与打包环境统一可用。
+- `更新链路`：抓取流程为“爬题 → 本地化题图 → 生成种子库 → 同步本地 SQLite”，数据结构更稳定。
+
 ## 快速开始
 
 ```bash
@@ -69,6 +77,15 @@ npm run build
 
 # 重建 Electron 原生依赖
 npm run rebuild:electron
+
+# 从本地官方库重建种子库
+npm run build:saduck-seed
+
+# 将种子库同步到本地用户数据库
+npm run sync:saduck-seed
+
+# 重新抓取官方题库并更新种子库/本地库
+npm run crawl:saduck
 
 # 本地打包 macOS
 npm run dist:mac

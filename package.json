@@ -1,6 +1,6 @@
 {
   "name": "openexam",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -21,11 +21,7 @@
     "@anthropic-ai/sdk": "^0.72.1",
     "better-sqlite3": "^12.6.2",
     "electron-updater": "^6.8.3",
-    "openai": "^6.17.0",
-    "pdfjs-dist": "^5.5.207",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "xlsx": "^0.18.5"
+    "openai": "^6.17.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
@@ -33,7 +29,11 @@
     "electron": "^30.0.2",
     "electron-builder": "^26.8.1",
     "vite": "^5.4.8",
-    "wait-on": "^7.2.0"
+    "wait-on": "^7.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "pdfjs-dist": "^5.5.207",
+    "xlsx": "^0.18.5"
   },
   "build": {
     "appId": "com.openexam.app",
@@ -97,6 +97,11 @@
           "**/*"
         ]
       }
+    ],
+    "compression": "maximum",
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
     ]
   },
   "description": "OpenExam desktop AI learning platform",

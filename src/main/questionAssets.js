@@ -23,13 +23,27 @@ function normalizeRelativePath(input = '') {
   return normalized;
 }
 
+const FALLBACK_EXTENSIONS = ['.webp', '.png', '.jpg', '.jpeg', '.gif', '.svg'];
+
 function resolveAssetPath(relativePath = '') {
   const safeRelativePath = normalizeRelativePath(relativePath);
   if (!safeRelativePath) return '';
+
+  const parsed = path.posix.parse(safeRelativePath);
+  const fallbackCandidates = parsed.ext
+    ? FALLBACK_EXTENSIONS.map((ext) => path.join(parsed.dir, `${parsed.name}${ext}`)).filter(Boolean)
+    : [];
+
   for (const root of getAssetRoots()) {
-    const candidate = path.join(root, safeRelativePath);
-    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-      return candidate;
+    const exact = path.join(root, safeRelativePath);
+    if (fs.existsSync(exact) && fs.statSync(exact).isFile()) {
+      return exact;
+    }
+    for (const fallbackRelativePath of fallbackCandidates) {
+      const candidate = path.join(root, fallbackRelativePath);
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+        return candidate;
+      }
     }
   }
   return '';

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/openexam-mark.svg" width="88" alt="OpenExam" />
+  <img src="docs/assets/readme/app-icon.png" width="96" alt="OpenExam App Icon" />
 </p>
 
 <h1 align="center">OpenExam</h1>
@@ -27,11 +27,19 @@ OpenExam 是一个基于 `Electron + React + SQLite` 的桌面端学习平台，
 ## 界面预览
 
 <p align="center">
-  <img src="docs/assets/readme-showcase.svg" alt="OpenExam Screenshots" width="100%" />
+  <img src="docs/assets/readme/demo1.png" alt="OpenExam Demo 1" width="49%" />
+  <img src="docs/assets/readme/demo2.png" alt="OpenExam Demo 2" width="49%" />
+</p>
+<p align="center">
+  <img src="docs/assets/readme/demo3.png" alt="OpenExam Demo 3" width="49%" />
+  <img src="docs/assets/readme/demo4.png" alt="OpenExam Demo 4" width="49%" />
+</p>
+<p align="center">
+  <img src="docs/assets/readme/demo5.png" alt="OpenExam Demo 5" width="100%" />
 </p>
 
 <p align="center">
-  <sub>学习中心 · 我的成长 · AI 智能导师 · 深色模式</sub>
+  <sub>学习中心 · 我的成长 · AI 智能导师 · 成就系统 · 深色模式</sub>
 </p>
 
 ## 核心能力

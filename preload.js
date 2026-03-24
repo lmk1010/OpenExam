@@ -43,6 +43,8 @@ contextBridge.exposeInMainWorld("openexam", {
     renameAIChatSession: (sessionId, title) => ipcRenderer.invoke("db:renameAIChatSession", sessionId, title),
     deleteAIChatSession: (sessionId) => ipcRenderer.invoke("db:deleteAIChatSession", sessionId),
     exportAllData: () => ipcRenderer.invoke("db:exportAllData"),
+    exportBackupFile: (clientState) => ipcRenderer.invoke("db:exportBackupFile", clientState),
+    importBackupFile: () => ipcRenderer.invoke("db:importBackupFile"),
     resetUserData: () => ipcRenderer.invoke("db:resetUserData"),
     clearAllData: () => ipcRenderer.invoke("db:clearAllData"),
   },

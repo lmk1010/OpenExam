@@ -40,6 +40,29 @@ const PROVINCES = [
   { key: '深圳', label: '深圳' },
 ];
 
+const PAPER_PROVINCE_ALIASES = {
+  '北京市': '北京',
+  '天津市': '天津',
+  '上海市': '上海',
+  '重庆市': '重庆',
+  '深圳市': '深圳',
+  '内蒙古自治区': '内蒙古',
+  '广西壮族自治区': '广西',
+  '宁夏回族自治区': '宁夏',
+  '新疆维吾尔自治区': '新疆',
+  '西藏自治区': '西藏',
+  '香港特别行政区': '香港',
+  '澳门特别行政区': '澳门',
+};
+
+function normalizePaperProvince(value) {
+  const province = String(value || '').trim();
+  if (!province) return '';
+  if (PAPER_PROVINCE_ALIASES[province]) return PAPER_PROVINCE_ALIASES[province];
+  if (province.endsWith('省') || province.endsWith('市')) return province.slice(0, -1);
+  return province;
+}
+
 const PAGE_SIZE = 12;
 
 function getPaperBadge(paper) {
@@ -53,7 +76,7 @@ function getPaperBadge(paper) {
     case 'imported':
       return { label: '导入', className: 'imported' };
     default:
-      return { label: paper?.province || '省考', className: 'provincial' };
+      return { label: normalizePaperProvince(paper?.province) || '省考', className: 'provincial' };
   }
 }
 
@@ -91,7 +114,7 @@ export default function PaperList({ onOpenPaper }) {
       if (selectedProvince === 'national') {
         if (p.type !== 'national') return false;
       } else {
-        if (p.province !== selectedProvince) return false;
+        if (normalizePaperProvince(p.province) !== selectedProvince) return false;
       }
     }
     // 年份筛选

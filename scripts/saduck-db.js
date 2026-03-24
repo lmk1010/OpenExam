@@ -7,6 +7,28 @@ const { normalizeQuestionTaxonomy, isFakeQuestion } = require('../src/shared/que
 
 const OFFICIAL_TYPES = ['national', 'provincial'];
 const DEFAULT_SEED_GZIP_PATH = path.join(__dirname, '../data/openexam.seed.db.gz');
+const PAPER_PROVINCE_ALIASES = {
+  '北京市': '北京',
+  '天津市': '天津',
+  '上海市': '上海',
+  '重庆市': '重庆',
+  '深圳市': '深圳',
+  '内蒙古自治区': '内蒙古',
+  '广西壮族自治区': '广西',
+  '宁夏回族自治区': '宁夏',
+  '新疆维吾尔自治区': '新疆',
+  '西藏自治区': '西藏',
+  '香港特别行政区': '香港',
+  '澳门特别行政区': '澳门',
+};
+
+function normalizePaperProvince(value) {
+  const province = String(value || '').trim();
+  if (!province) return null;
+  if (PAPER_PROVINCE_ALIASES[province]) return PAPER_PROVINCE_ALIASES[province];
+  if (province.endsWith('省') || province.endsWith('市')) return province.slice(0, -1);
+  return province;
+}
 
 function ensureDir(filePath) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -143,7 +165,7 @@ function insertOfficialPapers(db, papers = [], options = {}) {
         Number(paper.year) || new Date().getFullYear(),
         OFFICIAL_TYPES.includes(String(paper.type || '').trim()) ? paper.type : 'provincial',
         'xingce',
-        paper.province || null,
+        normalizePaperProvince(paper.province),
         validQuestions.length,
         120,
         Math.round(Number(paper.difficulty) || 3)
@@ -277,7 +299,7 @@ function loadOfficialPapersFromDatabase(dbPath) {
         title: paper.title,
         year: paper.year,
         type: paper.type,
-        province: paper.province,
+        province: normalizePaperProvince(paper.province),
         question_count: paper.question_count,
         difficulty: paper.difficulty,
         questions,

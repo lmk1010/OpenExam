@@ -31,6 +31,7 @@ export default function Settings({ onBack }) {
   const [appInfo, setAppInfo] = useState(null);
   const [updateState, setUpdateState] = useState(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [backupBusy, setBackupBusy] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -241,6 +242,22 @@ export default function Settings({ onBack }) {
     return '检查更新';
   })();
 
+  const collectBackupClientState = () => {
+    return RESETTABLE_LOCAL_KEYS.reduce((result, key) => {
+      const value = localStorage.getItem(key);
+      if (value !== null) result[key] = value;
+      return result;
+    }, {});
+  };
+
+  const restoreBackupClientState = (payload = {}) => {
+    RESETTABLE_LOCAL_KEYS.forEach((key) => localStorage.removeItem(key));
+    if (!payload || typeof payload !== 'object') return;
+    RESETTABLE_LOCAL_KEYS.forEach((key) => {
+      if (typeof payload[key] === 'string') localStorage.setItem(key, payload[key]);
+    });
+  };
+
   const handleProviderChange = (providerId) => {
     const provider = getAIProvider(providerId);
     setSettings(prev => {
@@ -264,16 +281,32 @@ export default function Settings({ onBack }) {
   };
 
   const handleExportAllData = async () => {
-    if (!window.openexam?.db?.exportAllData) {
-      alert('当前环境不支持导出');
-      return;
-    }
+    if (backupBusy) return;
 
     try {
+      setBackupBusy('export');
+      if (window.openexam?.db?.exportBackupFile) {
+        const result = await window.openexam.db.exportBackupFile(collectBackupClientState());
+        if (result?.canceled) return;
+        alert(`导出成功：${result?.filePath || '备份文件已保存'}`);
+        return;
+      }
+
+      if (!window.openexam?.db?.exportAllData) {
+        alert('当前环境不支持导出');
+        return;
+      }
+
       const payload = await window.openexam.db.exportAllData();
+      const backup = {
+        ...payload,
+        kind: 'openexam-backup',
+        version: 2,
+        client_state: collectBackupClientState(),
+      };
       const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
       const filename = `openexam-backup-${stamp}.json`;
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -283,6 +316,32 @@ export default function Settings({ onBack }) {
       alert(`导出成功：${filename}`);
     } catch (error) {
       alert(`导出失败：${error.message || '未知错误'}`);
+    } finally {
+      setBackupBusy('');
+    }
+  };
+
+  const handleImportBackupData = async () => {
+    if (backupBusy) return;
+    if (!window.openexam?.db?.importBackupFile) {
+      alert('当前环境不支持导入');
+      return;
+    }
+
+    const confirmed = window.confirm('导入备份会覆盖当前用户数据、练习历史、错题、本地会话和自定义内容，是否继续？');
+    if (!confirmed) return;
+
+    try {
+      setBackupBusy('import');
+      const result = await window.openexam.db.importBackupFile();
+      if (result?.canceled) return;
+      restoreBackupClientState(result?.clientState || {});
+      alert(`导入成功：已恢复 ${result?.stats?.papers || 0} 套试卷、${result?.stats?.questions || 0} 道题，应用将立即刷新。`);
+      window.location.reload();
+    } catch (error) {
+      alert(`导入失败：${error.message || '未知错误'}`);
+    } finally {
+      setBackupBusy('');
     }
   };
 
@@ -575,30 +634,47 @@ export default function Settings({ onBack }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div>
                 <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>数据管理</h3>
-                <p style={{ fontSize: 12, color: "var(--muted)" }}>导出备份，或将当前账号恢复到首次打开状态</p>
+                <p style={{ fontSize: 12, color: "var(--muted)" }}>支持导出完整备份、导入恢复个人历史与自定义内容，也可一键重置当前账号状态</p>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "20px", background: "var(--surface-soft)", borderRadius: 12, border: "1px solid var(--line)" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {['练习记录', '错题进度', 'AI 会话', 'AI 配置', '自定义试卷', '导入题库'].map((item) => (
+                  <span key={item} style={{ padding: "6px 10px", borderRadius: 999, background: "var(--surface-soft)", border: "1px solid var(--line)", fontSize: 11, color: "var(--muted)" }}>{item}</span>
+                ))}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "20px", background: "var(--surface-soft)", borderRadius: 12, border: "1px solid var(--line)", minWidth: 0 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--accent-soft-bg)", color: "var(--accent)", display: "grid", placeItems: "center" }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                   </div>
                   <div>
-                    <h4 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px 0", color: "var(--text)" }}>导出数据</h4>
-                    <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>将所有题目和练习记录导出为可移植格式</p>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px 0", color: "var(--text)" }}>导出完整备份</h4>
+                    <p style={{ fontSize: 11, color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>保存当前账号的题库、自定义试卷、做题历史、错题、设置与 AI 会话</p>
                   </div>
-                  <button onClick={handleExportAllData} style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>导出所有数据</button>
+                  <button onClick={handleExportAllData} disabled={backupBusy === 'export'} style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "1px solid var(--accent)", background: "transparent", color: "var(--accent)", fontSize: 12, fontWeight: 600, cursor: backupBusy === 'export' ? 'wait' : 'pointer', opacity: backupBusy === 'export' ? 0.7 : 1 }}>{backupBusy === 'export' ? '正在导出…' : '导出备份文件'}</button>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "20px", background: "var(--danger-soft)", borderRadius: 12, border: "1px solid var(--danger-border)" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "20px", background: "var(--surface-soft)", borderRadius: 12, border: "1px solid var(--line)", minWidth: 0 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(86, 110, 255, 0.10)", color: "#566eff", display: "grid", placeItems: "center" }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px 0", color: "var(--text)" }}>导入恢复</h4>
+                    <p style={{ fontSize: 11, color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>从备份文件恢复同一套体验，包含个人历史、错题、设置、聊天记录与自定义内容</p>
+                  </div>
+                  <button onClick={handleImportBackupData} disabled={backupBusy === 'import'} style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "1px solid #566eff", background: "transparent", color: "#566eff", fontSize: 12, fontWeight: 600, cursor: backupBusy === 'import' ? 'wait' : 'pointer', opacity: backupBusy === 'import' ? 0.7 : 1 }}>{backupBusy === 'import' ? '正在导入…' : '选择备份文件'}</button>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "20px", background: "var(--danger-soft)", borderRadius: 12, border: "1px solid var(--danger-border)", minWidth: 0 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--danger-soft)", color: "var(--danger)", display: "grid", placeItems: "center" }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                   </div>
                   <div>
                     <h4 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px 0", color: "var(--danger)" }}>重置用户数据</h4>
-                    <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>保留内置题库，清空练习进度、错题、AI 会话、设置与自定义内容</p>
+                    <p style={{ fontSize: 11, color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>保留内置题库，清空练习进度、错题、AI 会话、设置与自定义内容</p>
                   </div>
-                  <button onClick={handleResetUserData} style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "none", background: "var(--danger)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>恢复新用户状态</button>
+                  <button onClick={handleResetUserData} disabled={!!backupBusy} style={{ marginTop: "auto", padding: "8px 0", borderRadius: 6, border: "none", background: "var(--danger)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: backupBusy ? 'not-allowed' : 'pointer', opacity: backupBusy ? 0.7 : 1 }}>恢复新用户状态</button>
                 </div>
               </div>
             </div>

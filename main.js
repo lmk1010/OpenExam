@@ -4,6 +4,7 @@ const database = require("./src/main/database.js");
 const paperExport = require("./src/main/paperExport.js");
 const updater = require("./src/main/updater.js");
 const questionAssets = require("./src/main/questionAssets.js");
+const dataBackup = require("./src/main/dataBackup.js");
 
 const APP_ICON_PATH = path.join(__dirname, "src", "renderer", "assets", "openexam-app-icon.png");
 const APP_ICON = nativeImage.createFromPath(APP_ICON_PATH);
@@ -227,6 +228,35 @@ ipcMain.handle("db:deleteAIChatSession", (event, sessionId) => {
 
 ipcMain.handle("db:exportAllData", () => {
   return database.exportAllData();
+});
+
+ipcMain.handle("db:exportBackupFile", async (event, clientState) => {
+  const snapshot = database.exportAllData();
+  const payload = {
+    ...snapshot,
+    kind: "openexam-backup",
+    version: 2,
+    app: { name: "OpenExam", version: app.getVersion() },
+    client_state: clientState && typeof clientState === "object" ? clientState : {},
+  };
+  const result = await dataBackup.saveBackupFile(BrowserWindow.fromWebContents(event.sender), payload);
+  return result?.canceled ? { canceled: true } : { ...result, stats: snapshot.stats };
+});
+
+ipcMain.handle("db:importBackupFile", async (event) => {
+  const opened = await dataBackup.openBackupFile(BrowserWindow.fromWebContents(event.sender));
+  if (opened?.canceled) return { canceled: true };
+
+  const result = database.importAllData(opened.payload || {});
+  return {
+    canceled: false,
+    filePath: opened.filePath,
+    importedAt: result.imported_at,
+    stats: result.stats,
+    clientState: opened.payload?.client_state && typeof opened.payload.client_state === "object"
+      ? opened.payload.client_state
+      : {},
+  };
 });
 
 ipcMain.handle("db:resetUserData", () => {

@@ -11,6 +11,53 @@ let db = null;
 const REVIEW_INTERVAL_DAYS = [0, 1, 2, 4, 7, 15, 30];
 const USER_GENERATED_PAPER_TYPES = ['imported', 'ai_exam', 'ai_practice'];
 const USER_GENERATED_PAPER_TYPE_SQL = USER_GENERATED_PAPER_TYPES.map((type) => `\'${type}\'`).join(', ');
+const PAPER_PROVINCE_ALIASES = {
+  '北京市': '北京',
+  '天津市': '天津',
+  '上海市': '上海',
+  '重庆市': '重庆',
+  '深圳市': '深圳',
+  '内蒙古自治区': '内蒙古',
+  '广西壮族自治区': '广西',
+  '宁夏回族自治区': '宁夏',
+  '新疆维吾尔自治区': '新疆',
+  '西藏自治区': '西藏',
+  '香港特别行政区': '香港',
+  '澳门特别行政区': '澳门',
+};
+
+function normalizePaperProvince(value) {
+  const province = String(value || '').trim();
+  if (!province) return null;
+  if (PAPER_PROVINCE_ALIASES[province]) return PAPER_PROVINCE_ALIASES[province];
+  if (province.endsWith('省') || province.endsWith('市')) return province.slice(0, -1);
+  return province;
+}
+
+function normalizePaperRecord(paper = {}) {
+  return {
+    ...paper,
+    province: paper?.type === 'national' ? null : (normalizePaperProvince(paper?.province) || null),
+  };
+}
+
+function normalizePaperRecords(records = []) {
+  return Array.isArray(records) ? records.map((record) => normalizePaperRecord(record)) : [];
+}
+
+function normalizePaperProvinceData() {
+  const rows = db.prepare('SELECT id, type, province FROM papers').all();
+  if (!rows.length) return;
+
+  const update = db.prepare('UPDATE papers SET province = ? WHERE id = ?');
+  db.transaction(() => {
+    rows.forEach((row) => {
+      const nextProvince = row.type === 'national' ? null : (normalizePaperProvince(row.province) || null);
+      const currentProvince = row.province == null || String(row.province).trim() === '' ? null : row.province;
+      if (nextProvince !== currentProvince) update.run(nextProvince, row.id);
+    });
+  })();
+}
 
 function removeDatabaseArtifacts(dbPath) {
   ['', '-wal', '-shm'].forEach((suffix) => {
@@ -311,6 +358,7 @@ function initDatabase() {
   ensurePracticeRecordsSchema();
   ensureWrongQuestionsSchema();
   ensureQuestionsSchema();
+  normalizePaperProvinceData();
 
   // 插入示例数据（如果表为空）
   const count = db.prepare('SELECT COUNT(*) as count FROM papers').get();
@@ -394,7 +442,7 @@ function insertSampleData() {
 
 // 获取所有试卷
 function getPapers() {
-  return db.prepare('SELECT * FROM papers ORDER BY year DESC, created_at DESC').all();
+  return normalizePaperRecords(db.prepare('SELECT * FROM papers ORDER BY year DESC, created_at DESC').all());
 }
 
 // 获取试卷题目
@@ -720,7 +768,7 @@ function savePaperBundle(paperData = {}, questions = [], fallbackType = 'importe
       Number(paperData.year) || new Date().getFullYear(),
       paperType,
       String(paperData.subject || 'xingce').trim() || 'xingce',
-      paperData.province || null,
+      normalizePaperProvince(paperData.province),
       normalizedQuestions.length,
       duration,
       difficulty
@@ -772,26 +820,26 @@ function saveAIPaper(paperData, questions) {
 
 // 获取导入的试卷列表
 function getImportedPapers() {
-  return db.prepare(`
+  return normalizePaperRecords(db.prepare(`
     SELECT * FROM papers
     WHERE type = 'imported'
     ORDER BY created_at DESC
-  `).all();
+  `).all());
 }
 
 function getSavedAIPapers() {
-  return db.prepare(`
+  return normalizePaperRecords(db.prepare(`
     SELECT * FROM papers
     WHERE type IN ('ai_exam', 'ai_practice')
     ORDER BY created_at DESC
-  `).all();
+  `).all());
 }
 
 function getSavedPaperForManage(paperId) {
   const id = String(paperId || '').trim();
   if (!id) throw new Error('内容不存在');
 
-  const paper = db.prepare('SELECT * FROM papers WHERE id = ?').get(id);
+  const paper = normalizePaperRecord(db.prepare('SELECT * FROM papers WHERE id = ?').get(id));
   if (!paper) throw new Error('内容不存在或已删除');
   if (!SAVED_AI_PAPER_TYPES.has(String(paper.type || '').trim())) throw new Error('仅支持管理已保存 AI 内容');
 
@@ -1322,7 +1370,7 @@ function exportAllData() {
     }
   };
 
-  const papers = db.prepare('SELECT * FROM papers ORDER BY year DESC, created_at DESC').all();
+  const papers = normalizePaperRecords(db.prepare('SELECT * FROM papers ORDER BY year DESC, created_at DESC').all());
   const questions = db.prepare('SELECT * FROM questions ORDER BY paper_id, order_num ASC').all().map((row) => ({
     ...row,
     options: safeParseJSON(row.options, []),
@@ -1357,6 +1405,217 @@ function exportAllData() {
       app_settings: appSettings,
       ai_chat_sessions: aiChatSessions,
       ai_chat_messages: aiChatMessages,
+    },
+  };
+}
+
+function importAllData(payload = {}) {
+  if (!payload || typeof payload !== 'object') throw new Error('备份文件不能为空');
+
+  const data = payload.data && typeof payload.data === 'object' ? payload.data : payload;
+  const requiredKeys = ['papers', 'questions', 'practice_records', 'wrong_questions', 'app_settings', 'ai_chat_sessions', 'ai_chat_messages'];
+  const missingKey = requiredKeys.find((key) => !Array.isArray(data[key]));
+  if (missingKey) throw new Error(`备份文件缺少 ${missingKey} 数据`);
+
+  const papers = normalizePaperRecords(data.papers);
+  const paperIds = new Set();
+  const questionIds = new Set();
+  const sessionIds = new Set();
+
+  const insertPaper = db.prepare(`
+    INSERT INTO papers (id, title, year, type, subject, province, question_count, duration, difficulty, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertQuestion = db.prepare(`
+    INSERT INTO questions (id, paper_id, order_num, type, category, sub_category, content, content_html, options, answer, analysis, analysis_html, difficulty, tags, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertPracticeRecord = db.prepare(`
+    INSERT INTO practice_records (id, paper_id, category, sub_category, start_time, end_time, duration, status, answers, correct_count, total_count, accuracy, score, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertWrongQuestion = db.prepare(`
+    INSERT INTO wrong_questions (id, question_id, paper_id, user_answer, correct_answer, added_at, review_count, last_review, next_review_at, review_stage)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertAppSetting = db.prepare(`
+    INSERT INTO app_settings (key, value, updated_at)
+    VALUES (?, ?, ?)
+  `);
+  const insertChatSession = db.prepare(`
+    INSERT INTO ai_chat_sessions (id, title, provider, model, message_count, last_message_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertChatMessage = db.prepare(`
+    INSERT INTO ai_chat_messages (id, session_id, role, content, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  db.transaction(() => {
+    db.prepare('DELETE FROM ai_chat_messages').run();
+    db.prepare('DELETE FROM ai_chat_sessions').run();
+    db.prepare('DELETE FROM wrong_questions').run();
+    db.prepare('DELETE FROM practice_records').run();
+    db.prepare('DELETE FROM questions').run();
+    db.prepare('DELETE FROM papers').run();
+    db.prepare('DELETE FROM app_settings').run();
+
+    papers.forEach((paper) => {
+      const id = String(paper?.id || '').trim();
+      if (!id) return;
+      paperIds.add(id);
+      insertPaper.run(
+        id,
+        String(paper.title || 'OpenExam 试卷').trim() || 'OpenExam 试卷',
+        Number(paper.year) || new Date().getFullYear(),
+        String(paper.type || 'provincial').trim() || 'provincial',
+        String(paper.subject || 'xingce').trim() || 'xingce',
+        normalizePaperProvince(paper.province),
+        Math.max(0, Number(paper.question_count) || 0),
+        Math.max(1, Number(paper.duration) || 120),
+        Math.max(1, Math.min(5, Number(paper.difficulty) || 3)),
+        String(paper.created_at || toSQLiteDateTime())
+      );
+    });
+
+    data.questions.forEach((question, index) => {
+      const questionId = String(question?.id || `q_import_${index + 1}`).trim();
+      const paperId = String(question?.paper_id || '').trim();
+      const content = String(question?.content || '').trim();
+      if (!questionId || !paperIds.has(paperId) || !content) return;
+      questionIds.add(questionId);
+      const taxonomy = normalizeQuestionTaxonomy({
+        category: question.category,
+        subCategory: question.sub_category,
+        content,
+      });
+      insertQuestion.run(
+        questionId,
+        paperId,
+        Math.max(1, Number(question.order_num) || (index + 1)),
+        normalizeQuestionType(question.type),
+        taxonomy.category,
+        taxonomy.subCategory,
+        content,
+        String(question.content_html || '').trim() || null,
+        JSON.stringify(normalizeQuestionOptions(question.options)),
+        String(question.answer || '').trim().toUpperCase(),
+        String(question.analysis || ''),
+        String(question.analysis_html || '').trim() || null,
+        Math.max(1, Math.min(5, Number(question.difficulty) || 2)),
+        normalizeQuestionTags(question.tags),
+        String(question.created_at || toSQLiteDateTime())
+      );
+    });
+
+    data.practice_records.forEach((record, index) => {
+      const id = String(record?.id || `record_import_${index + 1}`).trim();
+      if (!id || !record?.start_time) return;
+      insertPracticeRecord.run(
+        id,
+        record.paper_id ? String(record.paper_id) : null,
+        record.category ? String(record.category) : null,
+        record.sub_category ? String(record.sub_category) : null,
+        String(record.start_time),
+        record.end_time ? String(record.end_time) : null,
+        Number(record.duration) || 0,
+        String(record.status || 'completed'),
+        JSON.stringify(record.answers && typeof record.answers === 'object' ? record.answers : {}),
+        Math.max(0, Number(record.correct_count) || 0),
+        Math.max(0, Number(record.total_count) || 0),
+        Math.max(0, Number(record.accuracy) || 0),
+        Math.max(0, Number(record.score) || 0),
+        String(record.created_at || toSQLiteDateTime())
+      );
+    });
+
+    data.wrong_questions.forEach((item, index) => {
+      const id = String(item?.id || `wrong_import_${index + 1}`).trim();
+      const questionId = String(item?.question_id || '').trim();
+      const paperId = String(item?.paper_id || '').trim();
+      if (!id || !questionIds.has(questionId) || !paperIds.has(paperId)) return;
+      insertWrongQuestion.run(
+        id,
+        questionId,
+        paperId,
+        item.user_answer ? String(item.user_answer) : null,
+        item.correct_answer ? String(item.correct_answer) : null,
+        String(item.added_at || toSQLiteDateTime()),
+        Math.max(0, Number(item.review_count) || 0),
+        item.last_review ? String(item.last_review) : null,
+        item.next_review_at ? String(item.next_review_at) : null,
+        Math.max(0, Number(item.review_stage) || 0)
+      );
+    });
+
+    data.app_settings.forEach((item) => {
+      const key = String(item?.key || '').trim();
+      if (!key) return;
+      insertAppSetting.run(key, String(item.value || ''), String(item.updated_at || toSQLiteDateTime()));
+    });
+
+    data.ai_chat_sessions.forEach((session, index) => {
+      const id = String(session?.id || `chat_import_${index + 1}`).trim();
+      if (!id) return;
+      sessionIds.add(id);
+      insertChatSession.run(
+        id,
+        String(session.title || '新会话').trim() || '新会话',
+        session.provider ? String(session.provider) : null,
+        session.model ? String(session.model) : null,
+        Math.max(0, Number(session.message_count) || 0),
+        session.last_message_at ? String(session.last_message_at) : null,
+        String(session.created_at || toSQLiteDateTime()),
+        String(session.updated_at || toSQLiteDateTime())
+      );
+    });
+
+    data.ai_chat_messages.forEach((message, index) => {
+      const id = String(message?.id || `msg_import_${index + 1}`).trim();
+      const sessionId = String(message?.session_id || '').trim();
+      const content = String(message?.content || '').trim();
+      if (!id || !sessionIds.has(sessionId) || !content) return;
+      insertChatMessage.run(
+        id,
+        sessionId,
+        String(message.role || 'assistant').trim() || 'assistant',
+        content,
+        String(message.created_at || toSQLiteDateTime())
+      );
+    });
+
+    db.prepare(`
+      UPDATE papers
+      SET question_count = (
+        SELECT COUNT(*) FROM questions WHERE paper_id = papers.id
+      )
+    `).run();
+
+    db.prepare(`
+      UPDATE ai_chat_sessions
+      SET
+        message_count = (
+          SELECT COUNT(*) FROM ai_chat_messages WHERE session_id = ai_chat_sessions.id
+        ),
+        last_message_at = (
+          SELECT MAX(created_at) FROM ai_chat_messages WHERE session_id = ai_chat_sessions.id
+        )
+    `).run();
+  })();
+
+  normalizePaperProvinceData();
+
+  return {
+    success: true,
+    imported_at: new Date().toISOString(),
+    stats: {
+      papers: db.prepare('SELECT COUNT(*) AS c FROM papers').get().c,
+      questions: db.prepare('SELECT COUNT(*) AS c FROM questions').get().c,
+      practice_records: db.prepare('SELECT COUNT(*) AS c FROM practice_records').get().c,
+      wrong_questions: db.prepare('SELECT COUNT(*) AS c FROM wrong_questions').get().c,
+      app_settings: db.prepare('SELECT COUNT(*) AS c FROM app_settings').get().c,
+      ai_chat_sessions: db.prepare('SELECT COUNT(*) AS c FROM ai_chat_sessions').get().c,
+      ai_chat_messages: db.prepare('SELECT COUNT(*) AS c FROM ai_chat_messages').get().c,
     },
   };
 }
@@ -1481,6 +1740,7 @@ module.exports = {
   renameAIChatSession,
   deleteAIChatSession,
   exportAllData,
+  importAllData,
   resetUserData,
   clearAllData,
   closeDatabase

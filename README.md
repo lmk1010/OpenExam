@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/readme/app-icon.png" width="96" alt="OpenExam App Icon" />
+  <img src="src/renderer/assets/openexam-app-icon.png" width="96" alt="OpenExam App Icon" />
 </p>
 
 <h1 align="center">OpenExam</h1>

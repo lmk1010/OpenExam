@@ -16,6 +16,7 @@ import OnboardingTour from "./components/OnboardingTour.jsx";
 import { actions, getState } from "./store/examStore.js";
 import { normalizeAISettings } from "./store/aiSettings.js";
 import appLogo from "./assets/openexam-logo.png";
+import { useDialog } from "./components/DialogProvider.jsx";
 
 const DynamicChart = ({ data, onHover }) => {
   const containerRef = React.useRef(null);
@@ -169,11 +170,17 @@ export default function App() {
   const [practiceConfig, setPracticeConfig] = useState(null); // 练习配置
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingClosing, setOnboardingClosing] = useState(false);
+  const [appRevealActive, setAppRevealActive] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profile, setProfile] = useState({ name: "考生用户" });
   const userMenuRef = useRef(null);
+  const onboardingCloseTimerRef = useRef(null);
+  const appRevealTimerRef = useRef(null);
+  const updatePromptedVersionRef = useRef("");
   const displayName = String(profile?.name || "考生用户").trim() || "考生用户";
   const avatarLetter = Array.from(displayName)[0] || "考";
+  const { alert: showAlert, confirm: showConfirm } = useDialog();
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -244,34 +251,72 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!window.openexam?.app?.onUpdateState) return undefined;
+    const dispose = window.openexam.app.onUpdateState(async (payload) => {
+      if (!payload || payload.status !== 'downloaded' || !payload.canAutoInstall) return;
+      const version = String(payload.latestVersion || 'downloaded');
+      if (updatePromptedVersionRef.current === version) return;
+      updatePromptedVersionRef.current = version;
+      const confirmed = await showConfirm({
+        title: '更新已就绪',
+        message: `OpenExam ${payload.latestVersion || ''} 已下载完成，是否现在重启安装？`.trim(),
+        confirmText: '立即安装',
+        cancelText: '稍后',
+        tone: 'success',
+      });
+      if (confirmed && window.openexam?.app?.quitAndInstallUpdate) {
+        await window.openexam.app.quitAndInstallUpdate();
+      }
+    });
+    return () => dispose?.();
+  }, [showConfirm]);
+
+  useEffect(() => {
     setUserMenuOpen(false);
   }, [page]);
 
+  useEffect(() => () => {
+    if (onboardingCloseTimerRef.current) window.clearTimeout(onboardingCloseTimerRef.current);
+    if (appRevealTimerRef.current) window.clearTimeout(appRevealTimerRef.current);
+  }, []);
+
   const finishOnboarding = async (payload = {}) => {
+    if (onboardingClosing) return;
     const nextName = String(payload?.name || displayName).trim() || "考生用户";
 
-    try {
-      if (window.openexam?.app?.saveProfile) {
-        const result = await window.openexam.app.saveProfile({ name: nextName });
-        if (result?.profile) {
-          setProfile(result.profile);
-        } else {
-          setProfile({ name: nextName });
-        }
-      } else {
-        setProfile({ name: nextName });
-      }
-    } catch (error) {
-      console.error("保存用户信息失败:", error);
-      setProfile({ name: nextName });
-    }
+    setProfile({ name: nextName });
 
     try {
       localStorage.setItem(ONBOARDING_STORAGE_KEY, "1");
     } catch (error) {
       // ignore storage failures
     }
-    setShowOnboarding(false);
+
+    if (onboardingCloseTimerRef.current) window.clearTimeout(onboardingCloseTimerRef.current);
+    if (appRevealTimerRef.current) window.clearTimeout(appRevealTimerRef.current);
+
+    setOnboardingClosing(true);
+    setAppRevealActive(true);
+
+    onboardingCloseTimerRef.current = window.setTimeout(() => {
+      setShowOnboarding(false);
+      setOnboardingClosing(false);
+    }, 420);
+
+    appRevealTimerRef.current = window.setTimeout(() => {
+      setAppRevealActive(false);
+    }, 720);
+
+    try {
+      if (window.openexam?.app?.saveProfile) {
+        const result = await window.openexam.app.saveProfile({ name: nextName });
+        if (result?.profile) {
+          setProfile(result.profile);
+        }
+      }
+    } catch (error) {
+      console.error("保存用户信息失败:", error);
+    }
   };
 
   const handleOnboardingNavigate = ({ page: targetPage, tab }) => {
@@ -282,12 +327,19 @@ export default function App() {
   const onboarding = (
     <OnboardingTour
       open={showOnboarding}
+      closing={onboardingClosing}
       defaultName={displayName}
       onFinish={finishOnboarding}
       onSkip={() => finishOnboarding({ name: displayName })}
       onNavigate={handleOnboardingNavigate}
     />
   );
+
+  const appStageClassName = [
+    "app-stage",
+    showOnboarding && !onboardingClosing ? "is-covered" : "",
+    appRevealActive ? "is-revealing" : "",
+  ].filter(Boolean).join(" ");
 
   const getReturnTab = (targetPage) => ({
     practice: "题库练习",
@@ -304,14 +356,14 @@ export default function App() {
 
   const handleStartSavedPractice = async (paperId, paperTitle, returnPage = "practice") => {
     if (!window.openexam?.db?.getQuestions) {
-      alert('数据库未连接');
+      await showAlert({ title: '无法开始练习', message: '数据库未连接，请稍后重试。', tone: 'warning' });
       return;
     }
 
     try {
       const questions = await window.openexam.db.getQuestions(paperId);
       if (!questions.length) {
-        alert('该练习暂无题目');
+        await showAlert({ title: '暂无题目', message: '这份自定义练习还没有可用题目。', tone: 'info' });
         return;
       }
       setPracticeQuestions(questions);
@@ -320,7 +372,7 @@ export default function App() {
       setPage("practice-exam");
     } catch (err) {
       console.error('加载练习失败:', err);
-      alert('加载练习失败');
+      await showAlert({ title: '加载练习失败', message: '未能读取这份练习，请稍后再试。', tone: 'danger' });
     }
   };
 
@@ -344,7 +396,7 @@ export default function App() {
     console.log('开始练习:', category, subCategory, config);
 
     if (!window.openexam?.db) {
-      alert('数据库未连接');
+      await showAlert({ title: '无法开始练习', message: '数据库未连接，请稍后重试。', tone: 'warning' });
       return;
     }
 
@@ -357,7 +409,7 @@ export default function App() {
       );
 
       if (questions.length === 0) {
-        alert('该分类暂无题目');
+          await showAlert({ title: '暂无题目', message: '当前筛选分类下还没有题目。', tone: 'info' });
         return;
       }
 
@@ -367,7 +419,7 @@ export default function App() {
       setPage("practice-exam");
     } catch (err) {
       console.error('加载题目失败:', err);
-      alert('加载题目失败');
+      await showAlert({ title: '加载题目失败', message: '题目读取异常，请稍后重试。', tone: 'danger' });
     }
   };
 
@@ -410,7 +462,9 @@ export default function App() {
   if (page === "exam" && currentPaperId) {
     return (
       <div className={`app theme-${theme}`}>
-        <ExamRoom paperId={currentPaperId} onFinish={handleFinishExam} onExit={handleExitExam} />
+        <div className={appStageClassName}>
+          <ExamRoom paperId={currentPaperId} onFinish={handleFinishExam} onExit={handleExitExam} />
+        </div>
         {onboarding}
       </div>
     );
@@ -420,17 +474,19 @@ export default function App() {
   if (page === "practice-exam" && practiceQuestions) {
     return (
       <div className={`app theme-${theme}`}>
-        <ExamRoom
-          questions={practiceQuestions}
-          config={practiceConfig}
-          onFinish={handleFinishExam}
-          onExit={() => {
-            setPracticeQuestions(null);
-            setPracticeConfig(null);
-            setActiveTab(getReturnTab(resultReturnPage));
-            setPage(resultReturnPage);
-          }}
-        />
+        <div className={appStageClassName}>
+          <ExamRoom
+            questions={practiceQuestions}
+            config={practiceConfig}
+            onFinish={handleFinishExam}
+            onExit={() => {
+              setPracticeQuestions(null);
+              setPracticeConfig(null);
+              setActiveTab(getReturnTab(resultReturnPage));
+              setPage(resultReturnPage);
+            }}
+          />
+        </div>
         {onboarding}
       </div>
     );
@@ -440,7 +496,9 @@ export default function App() {
   if (page === "result" && examResult) {
     return (
       <div className={`app theme-${theme}`}>
-        <ExamResult result={examResult} onBack={handleBackToList} />
+        <div className={appStageClassName}>
+          <ExamResult result={examResult} onBack={handleBackToList} />
+        </div>
         {onboarding}
       </div>
     );
@@ -448,7 +506,8 @@ export default function App() {
 
   return (
     <div className={`app theme-${theme}`}>
-      <div className={`frame ${sidebarExpanded ? 'sidebar-expanded' : ''}`}>
+      <div className={appStageClassName}>
+        <div className={`frame ${sidebarExpanded ? 'sidebar-expanded' : ''}`}>
         <aside className="rail">
           <button className="rail-menu" aria-label="菜单" onClick={() => setSidebarExpanded(!sidebarExpanded)}>
             <span /><span /><span />
@@ -618,6 +677,7 @@ export default function App() {
             )}
           </div>
         </section>
+        </div>
       </div>
       {onboarding}
     </div>

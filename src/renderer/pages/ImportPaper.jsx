@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { getAISettings, isAIConfigured, isOCRConfigured } from '../store/aiSettings.js';
+import { useDialog } from '../components/DialogProvider.jsx';
 
 const categoryConfig = {
   yanyu: { name: '言语理解', color: 'var(--category-yanyu)' },
@@ -77,6 +78,7 @@ export default function ImportPaper({ onBack, onImportComplete }) {
   const [parseError, setParseError] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [importHistory, setImportHistory] = useState([]);
+  const { alert: showAlert } = useDialog();
 
   // 加载导入历史
   useEffect(() => {
@@ -142,23 +144,23 @@ export default function ImportPaper({ onBack, onImportComplete }) {
       subCategory: question.subCategory || '',
     }));
 
-  const handleDrop = (e) => {
+  const handleDrop = async (e) => {
     e.preventDefault();
     setDragOver(false);
     const droppedFile = e.dataTransfer.files[0];
     if (droppedFile) {
-      validateAndSetFile(droppedFile);
+      await validateAndSetFile(droppedFile);
     }
   };
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      validateAndSetFile(selectedFile);
+      await validateAndSetFile(selectedFile);
     }
   };
 
-  const validateAndSetFile = (f) => {
+  const validateAndSetFile = async (f) => {
     const ext = f.name.split('.').pop().toLowerCase();
 
     if (importMode === 'ai') {
@@ -167,7 +169,7 @@ export default function ImportPaper({ onBack, onImportComplete }) {
         setConfig(prev => ({ ...prev, paperTitle: f.name.replace(/\.[^/.]+$/, '') }));
         setStep(2);
       } else {
-        alert('请选择 PDF 或图片文件');
+        await showAlert({ title: '文件类型不支持', message: '请选择 PDF 或图片文件。', tone: 'warning' });
       }
     } else {
       if (['csv', 'xls', 'xlsx', 'json'].includes(ext)) {
@@ -175,7 +177,7 @@ export default function ImportPaper({ onBack, onImportComplete }) {
         setConfig(prev => ({ ...prev, paperTitle: f.name.replace(/\.[^/.]+$/, '') }));
         setStep(2);
       } else {
-        alert('请选择 Excel、CSV 或 JSON 文件');
+        await showAlert({ title: '文件类型不支持', message: '请选择 Excel、CSV 或 JSON 文件。', tone: 'warning' });
       }
     }
   };
@@ -407,7 +409,7 @@ export default function ImportPaper({ onBack, onImportComplete }) {
           { title: config.paperTitle, year: config.year },
           parsedQuestions
         );
-        alert(`导入成功！共导入 ${result.questionCount} 道题目`);
+        await showAlert({ title: '导入成功', message: `共导入 ${result.questionCount} 道题目`, tone: 'success' });
       }
       onImportComplete?.({
         file,
@@ -415,7 +417,7 @@ export default function ImportPaper({ onBack, onImportComplete }) {
         questions: parsedQuestions,
       });
     } catch (err) {
-      alert('导入失败：' + err.message);
+      await showAlert({ title: '导入失败', message: err.message || '未知错误', tone: 'danger' });
     }
   };
 

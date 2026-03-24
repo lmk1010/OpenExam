@@ -104,9 +104,14 @@ npm run dist:win
 - Release 页面自动附带 macOS 首次打开说明。
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.2.1
+git push origin main
+git push origin v0.2.1
 ```
+
+## 更新日志
+
+- 最新版本说明见 `CHANGELOG.md`。
 
 ## macOS 首次打开说明
 

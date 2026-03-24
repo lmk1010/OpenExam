@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { actions } from '../store/examStore.js';
 import CustomSelect from '../components/CustomSelect.jsx';
 import { buildPaperShareText, copyText } from '../utils/paperShare.js';
+import { useDialog } from '../components/DialogProvider.jsx';
 
 // 省份标签数据
 const PROVINCES = [
@@ -90,8 +91,8 @@ export default function PaperList({ onOpenPaper }) {
   const [selectedProvince, setSelectedProvince] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [statusMessage, setStatusMessage] = useState(null);
   const [busyAction, setBusyAction] = useState('');
+  const { toast: showToast } = useDialog();
 
   // 加载试卷
   useEffect(() => {
@@ -141,16 +142,15 @@ export default function PaperList({ onOpenPaper }) {
   const handleExportPaper = async (paper) => {
     if (!paper?.id || !window.openexam?.db?.getQuestions || !window.openexam?.paper?.exportPdf) return;
     setBusyAction(`pdf:${paper.id}`);
-    setStatusMessage(null);
     try {
       const questions = await window.openexam.db.getQuestions(paper.id);
       const result = await window.openexam.paper.exportPdf({ paper, questions });
       if (result?.canceled) return;
       if (result?.success) {
-        setStatusMessage({ type: 'success', text: `已导出 PDF：${result.filePath}` });
+        showToast({ title: 'PDF 导出成功', message: result.filePath, tone: 'success' });
       }
     } catch (error) {
-      setStatusMessage({ type: 'error', text: error.message || 'PDF 导出失败' });
+      showToast({ title: 'PDF 导出失败', message: error.message || '未知错误', tone: 'danger' });
     } finally {
       setBusyAction('');
     }
@@ -159,13 +159,12 @@ export default function PaperList({ onOpenPaper }) {
   const handleSharePaper = async (paper) => {
     if (!paper?.id || !window.openexam?.db?.getQuestions) return;
     setBusyAction(`share:${paper.id}`);
-    setStatusMessage(null);
     try {
       const questions = await window.openexam.db.getQuestions(paper.id);
       await copyText(buildPaperShareText({ paper, questions }));
-      setStatusMessage({ type: 'success', text: `已复制分享文案：${paper.title}` });
+      showToast({ title: '复制成功', message: `已复制分享文案：${paper.title}`, tone: 'success' });
     } catch (error) {
-      setStatusMessage({ type: 'error', text: error.message || '分享文案复制失败' });
+      showToast({ title: '复制失败', message: error.message || '分享文案复制失败', tone: 'danger' });
     } finally {
       setBusyAction('');
     }
@@ -215,12 +214,6 @@ export default function PaperList({ onOpenPaper }) {
           <span className="result-count">共 {filteredPapers.length} 套试卷</span>
         </div>
       </div>
-
-      {statusMessage && (
-        <div style={{ marginBottom: 14, padding: '11px 14px', borderRadius: 14, border: statusMessage.type === 'error' ? '1px solid var(--danger-border)' : '1px solid var(--success-border)', background: statusMessage.type === 'error' ? 'var(--danger-soft)' : 'var(--success-soft)', color: statusMessage.type === 'error' ? 'var(--danger)' : 'var(--success)', fontSize: 12, lineHeight: 1.6 }}>
-          {statusMessage.text}
-        </div>
-      )}
 
       {/* 试卷列表 */}
       <div className="paper-grid">

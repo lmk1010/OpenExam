@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { getAISettings, isAIConfigured } from "../store/aiSettings.js";
 import { buildPaperShareText, copyText } from "../utils/paperShare.js";
+import { useDialog } from "../components/DialogProvider.jsx";
 
 const CATEGORIES = [
   { key: "yanyu", name: "言语理解" }, { key: "shuliang", name: "数量关系" },
@@ -71,8 +72,8 @@ export default function AIGenerate({ onOpenPaper }) {
   const [lastSavedPaper, setLastSavedPaper] = useState(null);
   const [editingPaperId, setEditingPaperId] = useState("");
   const [editingTitle, setEditingTitle] = useState("");
-  const [pendingDeleteId, setPendingDeleteId] = useState("");
   const [actionBusy, setActionBusy] = useState("");
+  const { toast: showToast, confirm: showConfirm } = useDialog();
   const progressTimerRef = useRef(null);
   const startedAtRef = useRef(0);
   const generationTokenRef = useRef(0);
@@ -92,6 +93,7 @@ export default function AIGenerate({ onOpenPaper }) {
     setElapsedMs(Date.now() - startedAtRef.current);
     setError(message);
     pushFeedback(feedbackType, message);
+    showToast({ title: phase, message, tone: feedbackType === "error" ? "danger" : feedbackType });
     setGenerating(false);
   };
 
@@ -124,6 +126,7 @@ export default function AIGenerate({ onOpenPaper }) {
       const msg = "请先在「设置」中配置 AI 服务。";
       setError(msg);
       pushFeedback("error", msg);
+      showToast({ title: "缺少 AI 配置", message: msg, tone: "warning" });
       return;
     }
     setGenerating(true);
@@ -134,7 +137,6 @@ export default function AIGenerate({ onOpenPaper }) {
     setLastSavedPaper(null);
     setEditingPaperId("");
     setEditingTitle("");
-    setPendingDeleteId("");
     startedAtRef.current = Date.now();
     pushFeedback("info", "开始生成试卷。");
     stopProgressTicker();
@@ -148,6 +150,7 @@ export default function AIGenerate({ onOpenPaper }) {
       if (elapsed >= LONG_WAIT_MS && !longWaitWarnedRef.current) {
         longWaitWarnedRef.current = true;
         pushFeedback("warning", "等待时间较长，可点击“取消生成”并调整参数后重试。");
+        showToast({ title: "生成耗时较长", message: "可点击“取消生成”并调整参数后重试。", tone: "warning", duration: 3200 });
       }
       setProgress((prev) => {
         const next = Math.min(98, prev + (prev < 25 ? 1.8 : prev < 60 ? 1.2 : prev < 90 ? 0.7 : 0.18));
@@ -167,6 +170,7 @@ export default function AIGenerate({ onOpenPaper }) {
         setPhaseText("生成完成");
         setElapsedMs(Date.now() - startedAtRef.current);
         pushFeedback("success", `生成成功，共 ${result.questions.length} 道题。${result.debugId ? ` [${result.debugId}]` : ""}`);
+        showToast({ title: "生成成功", message: `共生成 ${result.questions.length} 道题目。`, tone: "success" });
         setGenerated({ questions: result.questions, title: `${CATEGORIES.find(c => c.key === config.category)?.name} · ${DIFFICULTIES.find(d => d.value === config.difficulty)?.label}`, count: result.questions.length, time: new Date().toLocaleString() });
       } else {
         const msg = normalizeErrorMessage(result.error || "AI 未返回有效题目。");
@@ -209,6 +213,7 @@ export default function AIGenerate({ onOpenPaper }) {
     const title = String(saveTitle || generated?.title || "").trim();
     if (!title) {
       pushFeedback("warning", "请先填写保存名称。");
+      showToast({ title: "保存名称为空", message: "请先填写保存名称。", tone: "warning" });
       return;
     }
     setActionBusy(`save:${targetType}`);
@@ -230,12 +235,13 @@ export default function AIGenerate({ onOpenPaper }) {
       setLastSavedPaper(savedPaper);
       setEditingPaperId("");
       setEditingTitle("");
-      setPendingDeleteId("");
       setShowHistory(true);
       await loadHistoryPapers();
       pushFeedback("success", `${targetType === "ai_practice" ? "已保存自定义练习" : "已保存自定义试卷"}：${r.questionCount} 道题。`);
+      showToast({ title: targetType === "ai_practice" ? "练习已保存" : "试卷已保存", message: `${r.questionCount} 道题已持久化到本地。`, tone: "success" });
     } catch (e) {
       pushFeedback("error", `保存失败：${e.message || "未知错误"}`);
+      showToast({ title: "保存失败", message: e.message || "未知错误", tone: "danger" });
     } finally {
       setActionBusy("");
     }
@@ -246,9 +252,13 @@ export default function AIGenerate({ onOpenPaper }) {
     setActionBusy("pdf");
     try {
       const result = await window.openexam.paper.exportPdf(getGeneratedPaperPayload());
-      if (result?.success) pushFeedback("success", `PDF 已导出：${result.filePath}`);
+      if (result?.success) {
+        pushFeedback("success", `PDF 已导出：${result.filePath}`);
+        showToast({ title: "PDF 导出成功", message: result.filePath, tone: "success" });
+      }
     } catch (error) {
       pushFeedback("error", error.message || "PDF 导出失败");
+      showToast({ title: "PDF 导出失败", message: error.message || "未知错误", tone: "danger" });
     } finally {
       setActionBusy("");
     }
@@ -260,8 +270,10 @@ export default function AIGenerate({ onOpenPaper }) {
     try {
       await copyText(buildPaperShareText(getGeneratedPaperPayload()));
       pushFeedback("success", "分享文案已复制，可直接发送。");
+      showToast({ title: "复制成功", message: "分享文案已复制，可直接发送。", tone: "success" });
     } catch (error) {
       pushFeedback("error", error.message || "复制分享文案失败");
+      showToast({ title: "复制失败", message: error.message || "复制分享文案失败", tone: "danger" });
     } finally {
       setActionBusy("");
     }
@@ -282,6 +294,7 @@ export default function AIGenerate({ onOpenPaper }) {
         setHistoryError("暂无已保存内容，请先生成后点击保存。");
       }
     } catch (e) {
+      showToast({ title: "读取历史失败", message: e.message || "读取已保存内容失败", tone: "danger" });
       setHistoryError(e.message || "读取已保存内容失败");
       setHistoryPapers([]);
     } finally {
@@ -302,12 +315,12 @@ export default function AIGenerate({ onOpenPaper }) {
     try {
       await onOpenPaper(paper);
     } catch (e) {
+      showToast({ title: "打开失败", message: e.message || "启动内容失败", tone: "danger" });
       setHistoryError(e.message || "启动内容失败");
     }
   };
 
   const handleBeginRenamePaper = (paper) => {
-    setPendingDeleteId("");
     setEditingPaperId(paper?.id || "");
     setEditingTitle(String(paper?.title || ""));
   };
@@ -322,6 +335,7 @@ export default function AIGenerate({ onOpenPaper }) {
     if (!paperId || !window.openexam?.db?.renameSavedPaper) return;
     if (!title) {
       pushFeedback("warning", "名称不能为空。");
+      showToast({ title: "名称不能为空", message: "请输入新的保存名称。", tone: "warning" });
       return;
     }
     setActionBusy(`rename:${paperId}`);
@@ -332,32 +346,38 @@ export default function AIGenerate({ onOpenPaper }) {
       setEditingPaperId("");
       setEditingTitle("");
       pushFeedback("success", `已重命名：${updated.title}`);
+      showToast({ title: "重命名成功", message: updated.title, tone: "success" });
     } catch (e) {
       pushFeedback("error", `重命名失败：${e.message || "未知错误"}`);
+      showToast({ title: "重命名失败", message: e.message || "未知错误", tone: "danger" });
     } finally {
       setActionBusy("");
     }
   };
 
-  const handleAskDeletePaper = (paperId) => {
-    setEditingPaperId("");
-    setEditingTitle("");
-    setPendingDeleteId((prev) => (prev === paperId ? "" : paperId));
-  };
 
   const handleDeletePaper = async (paper) => {
     if (!paper?.id || !window.openexam?.db?.deleteSavedPaper) return;
+    const confirmed = await showConfirm({
+      title: '删除已保存内容',
+      message: `确定删除“${paper.title || '未命名内容'}”吗？删除后不可恢复。`,
+      confirmText: '确认删除',
+      cancelText: '取消',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     setActionBusy(`delete:${paper.id}`);
     try {
       const removed = await window.openexam.db.deleteSavedPaper(paper.id);
       if (lastSavedPaper?.id === paper.id) {
         setLastSavedPaper(null);
       }
-      setPendingDeleteId("");
       await loadHistoryPapers();
       pushFeedback("success", `已删除：${removed.title}`);
+      showToast({ title: '删除成功', message: removed.title || '已删除保存内容', tone: 'success' });
     } catch (e) {
       pushFeedback("error", `删除失败：${e.message || "未知错误"}`);
+      showToast({ title: '删除失败', message: e.message || '未知错误', tone: 'danger' });
     } finally {
       setActionBusy("");
     }
@@ -568,7 +588,6 @@ export default function AIGenerate({ onOpenPaper }) {
                     const meta = getSavedPaperMeta(paper.type);
                     const isJustSaved = lastSavedPaper?.id === paper.id;
                     const isEditing = editingPaperId === paper.id;
-                    const isPendingDelete = pendingDeleteId === paper.id;
                     const isBusy = actionBusy === `rename:${paper.id}` || actionBusy === `delete:${paper.id}`;
                     return (
                     <div key={paper.id} style={{ border: isJustSaved ? `1px solid ${meta.border}` : "1px solid var(--line)", borderRadius: 8, padding: "8px 10px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: isJustSaved ? meta.background : "transparent", boxShadow: isJustSaved ? "0 6px 18px rgba(15,23,42,0.06)" : "none" }}>
@@ -617,23 +636,6 @@ export default function AIGenerate({ onOpenPaper }) {
                               取消
                             </button>
                           </>
-                        ) : isPendingDelete ? (
-                          <>
-                            <button
-                              onClick={() => handleDeletePaper(paper)}
-                              disabled={isBusy}
-                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--danger-border)", background: "var(--danger-soft)", color: "var(--danger)", fontSize: 11, cursor: isBusy ? "wait" : "pointer", fontWeight: 600 }}
-                            >
-                              {actionBusy === `delete:${paper.id}` ? "删除中..." : "确认删除"}
-                            </button>
-                            <button
-                              onClick={() => setPendingDeleteId("")}
-                              disabled={isBusy}
-                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--muted)", fontSize: 11, cursor: isBusy ? "wait" : "pointer", fontWeight: 600 }}
-                            >
-                              取消
-                            </button>
-                          </>
                         ) : (
                           <>
                             <button
@@ -649,16 +651,18 @@ export default function AIGenerate({ onOpenPaper }) {
                               重命名
                             </button>
                             <button
-                              onClick={() => handleAskDeletePaper(paper.id)}
-                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--danger-border)", background: "var(--danger-soft)", color: "var(--danger)", fontSize: 11, cursor: "pointer", fontWeight: 600 }}
+                              onClick={() => handleDeletePaper(paper)}
+                              disabled={isBusy}
+                              style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid var(--danger-border)", background: "var(--danger-soft)", color: "var(--danger)", fontSize: 11, cursor: isBusy ? "wait" : "pointer", fontWeight: 600 }}
                             >
-                              删除
+                              {actionBusy === `delete:${paper.id}` ? "删除中..." : "删除"}
                             </button>
                           </>
                         )}
                       </div>
                     </div>
-                  );})}
+                  );
+                  })}
                 </div>
               )}
             </div>

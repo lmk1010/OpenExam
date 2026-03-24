@@ -54,20 +54,87 @@ const STEPS = [
   },
 ];
 
+const PROFILE_METRICS = [
+  { id: "paper", value: "95+", label: "精选试卷" },
+  { id: "bank", value: "1.5w+", label: "题目储备" },
+  { id: "ai", value: "AI", label: "智能助学" },
+  { id: "local", value: "Local", label: "本地优先" },
+];
+
+const PROFILE_FEATURES = [
+  { id: "practice", label: "专项练习" },
+  { id: "mock", label: "模拟考试" },
+  { id: "generate", label: "AI 出卷" },
+  { id: "review", label: "错题复盘" },
+];
+
+function ProfileMetricIcon({ id }) {
+  const commonProps = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.9", strokeLinecap: "round", strokeLinejoin: "round" };
+
+  switch (id) {
+    case "paper":
+      return <svg {...commonProps}><path d="M7 3.5h7l4 4V20a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 20V5A1.5 1.5 0 0 1 7.5 3.5Z"/><path d="M14 3.5V8h4"/><path d="M9 12h6"/><path d="M9 15.5h6"/></svg>;
+    case "bank":
+      return <svg {...commonProps}><path d="M4 7.5 12 4l8 3.5v1H4Z"/><path d="M6.5 10.5V16"/><path d="M12 10.5V16"/><path d="M17.5 10.5V16"/><path d="M4 19h16"/></svg>;
+    case "ai":
+      return <svg {...commonProps}><path d="M12 4.5a2 2 0 0 1 2 2v.6a5.5 5.5 0 0 1 4.9 4.9h.6a2 2 0 1 1 0 4h-.6a5.5 5.5 0 0 1-4.9 4.9v.6a2 2 0 1 1-4 0v-.6A5.5 5.5 0 0 1 5.1 16h-.6a2 2 0 1 1 0-4h.6A5.5 5.5 0 0 1 10 7.1v-.6a2 2 0 0 1 2-2Z"/><circle cx="9" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1" fill="currentColor" stroke="none"/></svg>;
+    default:
+      return <svg {...commonProps}><path d="M12 3.5c4.8 0 8.5 3.7 8.5 8.5S16.8 20.5 12 20.5 3.5 16.8 3.5 12 7.2 3.5 12 3.5Z"/><path d="M12 7.5v9"/><path d="M8.5 11.5c1.5 1 5.5 1 7 0"/></svg>;
+  }
+}
+
+function ProfileFeatureIcon({ id }) {
+  const commonProps = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.9", strokeLinecap: "round", strokeLinejoin: "round" };
+
+  switch (id) {
+    case "practice":
+      return <svg {...commonProps}><path d="M5.5 6.5h13"/><path d="M5.5 12h13"/><path d="M5.5 17.5h8"/></svg>;
+    case "mock":
+      return <svg {...commonProps}><path d="M7 4.5h10A1.5 1.5 0 0 1 18.5 6v12A1.5 1.5 0 0 1 17 19.5H7A1.5 1.5 0 0 1 5.5 18V6A1.5 1.5 0 0 1 7 4.5Z"/><path d="M9 9h6"/><path d="M9 13h6"/><path d="M9 17h3"/></svg>;
+    case "generate":
+      return <svg {...commonProps}><path d="M12 4.5v15"/><path d="M4.5 12h15"/><path d="m7.5 7.5 9 9"/><path d="m16.5 7.5-9 9"/></svg>;
+    default:
+      return <svg {...commonProps}><path d="M7.5 6.5h9A1.5 1.5 0 0 1 18 8v8.5A1.5 1.5 0 0 1 16.5 18h-9A1.5 1.5 0 0 1 6 16.5V8A1.5 1.5 0 0 1 7.5 6.5Z"/><path d="M9 10.5h6"/><path d="M9 14h4"/></svg>;
+  }
+}
+
 function renderVisual(step, name) {
   if (step.id === "profile") {
     return (
-      <div className="onboarding-visual-card onboarding-visual-profile">
-        <div className="onboarding-visual-avatar">{Array.from(name)[0] || "考"}</div>
-        <div className="onboarding-visual-copy">
-          <strong>{name}</strong>
-          <span>本地学习账户</span>
+      <div className="onboarding-profile-stage">
+        <div className="onboarding-profile-kicker">Local first workspace</div>
+        <div className="onboarding-profile-main">
+          <div className="onboarding-profile-emblem">
+            <div className="onboarding-visual-avatar">{Array.from(name)[0] || "考"}</div>
+          </div>
+          <div className="onboarding-visual-copy">
+            <strong>{name}</strong>
+            <span>你的本地备考空间</span>
+            <div className="onboarding-profile-meta">
+              <span>学习记录本地保存</span>
+              <span>打开即用</span>
+            </div>
+          </div>
         </div>
-        <div className="onboarding-visual-grid">
-          <div><b>95+</b><span>精选试卷</span></div>
-          <div><b>1.5w+</b><span>题目储备</span></div>
-          <div><b>AI</b><span>智能助学</span></div>
-          <div><b>Local</b><span>本地优先</span></div>
+        <div className="onboarding-profile-divider" />
+        <div className="onboarding-profile-stats">
+          {PROFILE_METRICS.map((metric) => (
+            <div key={metric.id} className="onboarding-profile-stat">
+              <span className={`onboarding-profile-icon ${metric.id}`}>
+                <ProfileMetricIcon id={metric.id} />
+              </span>
+              <b>{metric.value}</b>
+              <span>{metric.label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="onboarding-profile-tags">
+          {PROFILE_FEATURES.map((feature) => (
+            <span key={feature.id}>
+              <ProfileFeatureIcon id={feature.id} />
+              {feature.label}
+            </span>
+          ))}
         </div>
       </div>
     );
@@ -112,7 +179,7 @@ function renderVisual(step, name) {
   );
 }
 
-export default function OnboardingTour({ open, defaultName = "考生用户", onFinish, onSkip, onNavigate }) {
+export default function OnboardingTour({ open, closing = false, defaultName = "考生用户", onFinish, onSkip, onNavigate }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState(defaultName);
 
@@ -126,7 +193,9 @@ export default function OnboardingTour({ open, defaultName = "考生用户", onF
     return String(name || "").replace(/\s+/g, " ").trim().slice(0, 24) || "考生用户";
   }, [name]);
 
-  if (!open) return null;
+  const visible = open || closing;
+
+  if (!visible) return null;
 
   const current = STEPS[step];
   const isLast = step === STEPS.length - 1;
@@ -140,7 +209,7 @@ export default function OnboardingTour({ open, defaultName = "考生用户", onF
   };
 
   return (
-    <div className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="首次引导">
+    <div className={`onboarding-overlay ${closing ? "is-closing" : ""}`} role="dialog" aria-modal="true" aria-label="首次引导">
       <div className="onboarding-shell" style={{ "--onboarding-accent": current.accent }}>
         <section key={`visual-${current.id}`} className="onboarding-showcase">
           <div className="onboarding-showcase-bg" />

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, shell } = require('electron');
+const { app, BrowserWindow, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 
 const RELEASES_URL = 'https://github.com/lmk1010/OpenExam/releases';
@@ -127,25 +127,11 @@ function bindAutoUpdater() {
     patchState({
       status: 'downloaded',
       latestVersion: normalizeVersion(info?.version) || state.latestVersion,
-      message: '更新已下载完成，重启后即可安装',
+      message: '更新已下载完成，可在应用内立即重启安装',
       progress: 100,
       error: '',
       lastCheckedAt: new Date().toISOString(),
     });
-
-    dialog.showMessageBox({
-      type: 'info',
-      buttons: ['立即重启更新', '稍后'],
-      defaultId: 0,
-      cancelId: 1,
-      title: '更新已就绪',
-      message: `OpenExam ${normalizeVersion(info?.version) || ''} 已下载完成`.trim(),
-      detail: '点击“立即重启更新”完成安装。',
-    }).then(({ response }) => {
-      if (response === 0) {
-        autoUpdater.quitAndInstall();
-      }
-    }).catch(() => {});
   });
 
   autoUpdater.on('error', (error) => {

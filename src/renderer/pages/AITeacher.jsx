@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { getAISettings, isAIConfigured } from "../store/aiSettings.js";
 import CustomSelect from "../components/CustomSelect.jsx";
+import { useDialog } from "../components/DialogProvider.jsx";
 
 // ─── Icon ─────────────────────────────────────────────────────────────────────
 const Ico = ({ d, size = 14, col = "currentColor", sw = 1.8 }) => (
@@ -166,6 +167,7 @@ export default function AITeacher() {
   const streamRequestRef = useRef("");
   const configured = isAIConfigured();
   const db = window.openexam?.db;
+  const { confirm: showConfirm, prompt: showPrompt } = useDialog();
 
   const isNearBottom = (el, threshold = 80) => {
     if (!el) return true;
@@ -385,7 +387,16 @@ export default function AITeacher() {
     if (!activeSessionId || !db?.renameAIChatSession) return;
     const current = sessions.find((item) => item.id === activeSessionId);
     const baseTitle = current?.title || "新会话";
-    const nextTitle = window.prompt("请输入会话标题", baseTitle);
+    const nextTitle = await showPrompt({
+      title: "重命名会话",
+      message: "请输入新的会话标题。",
+      defaultValue: baseTitle,
+      placeholder: "例如：图推专项复盘",
+      confirmText: "保存",
+      cancelText: "取消",
+      tone: "info",
+      maxLength: 40,
+    });
     if (!nextTitle) return;
     const title = nextTitle.trim();
     if (!title || title === baseTitle) return;
@@ -395,7 +406,13 @@ export default function AITeacher() {
 
   const deleteSession = async (sessionId) => {
     if (!sessionId || loading || !db?.deleteAIChatSession) return;
-    if (!window.confirm("确定删除该会话及全部消息？")) return;
+    if (!await showConfirm({
+      title: "删除会话",
+      message: "确定删除该会话及全部消息？删除后不可恢复。",
+      confirmText: "确认删除",
+      cancelText: "取消",
+      tone: "danger",
+    })) return;
     await db.deleteAIChatSession(sessionId);
     let list = await refreshSessions();
     if (!list.length) {

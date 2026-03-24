@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import RichQuestionContent from '../components/RichQuestionContent.jsx';
+import { useDialog } from '../components/DialogProvider.jsx';
 import { getState, actions } from '../store/examStore.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -27,28 +28,6 @@ const Ico = ({ d, size = 14, sw = 1.8, col = 'currentColor', extra }) => (
   </svg>
 );
 
-// ─── Confirm modal ────────────────────────────────────────────────────────────
-function ConfirmModal({ show, title, message, onConfirm, onCancel }) {
-  if (!show) return null;
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center' }} onClick={onCancel}>
-      <div style={{ background: 'var(--surface)', width: 340, borderRadius: 18, padding: '28px 24px', boxShadow: '0 24px 48px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 14 }} onClick={e => e.stopPropagation()}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--accent-soft-bg)', color: 'var(--accent)', display: 'grid', placeItems: 'center' }}>
-          <Ico d={<><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>} size={22} sw={2} col="var(--accent)" />
-        </div>
-        <div>
-          <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 5px', color: 'var(--text)' }}>{title}</h3>
-          {message && <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0, lineHeight: 1.6 }}>{message}</p>}
-        </div>
-        <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-          <button style={{ flex: 1, padding: '9px 0', borderRadius: 8, background: 'var(--surface-soft)', color: 'var(--text)', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer' }} onClick={onCancel}>取消</button>
-          <button style={{ flex: 1, padding: '9px 0', borderRadius: 8, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: '0 10px 20px rgba(15,23,42,0.1)' }} onClick={onConfirm}>确定</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function ExamRoom({ paperId, questions: propQuestions, config, onFinish, onExit }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -57,8 +36,8 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
   const [questions, setQuestions]       = useState([]);
   const [paper, setPaper]               = useState(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
-  const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null });
   const [layoutMode, setLayoutMode]     = useState('split');
+  const { confirm: showConfirm } = useDialog();
   const bodyRef = useRef(null);
 
   useEffect(() => {
@@ -140,10 +119,27 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
       } catch (err) { console.error('保存失败:', err); }
       onFinish(result);
     };
-    setConfirmModal({ show: true, title: '确定交卷？', message: unanswered > 0 ? `还有 ${unanswered} 题未作答` : '提交后将无法修改答案', onConfirm: () => { setConfirmModal({ show: false }); doSubmit(); } });
+    const confirmed = await showConfirm({
+      title: '确认交卷',
+      message: unanswered > 0 ? `还有 ${unanswered} 题未作答，确认现在提交吗？` : '提交后将无法修改答案。',
+      confirmText: '立即交卷',
+      cancelText: '继续作答',
+      tone: unanswered > 0 ? 'warning' : 'info',
+    });
+    if (!confirmed) return;
+    await doSubmit();
   };
 
-  const handleExit = () => setConfirmModal({ show: true, title: '确定退出？', message: '当前答题进度将丢失', onConfirm: () => { setConfirmModal({ show: false }); onExit(); } });
+  const handleExit = async () => {
+    const confirmed = await showConfirm({
+      title: '确认退出',
+      message: '当前答题进度将丢失，确定退出吗？',
+      confirmText: '退出答题',
+      cancelText: '继续作答',
+      tone: 'danger',
+    });
+    if (confirmed) onExit();
+  };
 
   if (!currentQuestion || questions.length === 0) {
     return <div style={{ display: 'grid', placeItems: 'center', height: '100vh', color: 'var(--muted)', fontSize: 13 }}>加载中…</div>;
@@ -499,7 +495,6 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
         </div>
       </div>
 
-      <ConfirmModal show={confirmModal.show} title={confirmModal.title} message={confirmModal.message} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal({ show: false })} />
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
         ::-webkit-scrollbar { width: 4px; }

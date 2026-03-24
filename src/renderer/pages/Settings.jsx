@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AI_PROVIDERS, DEFAULT_AI_SETTINGS, getAIProvider, normalizeAISettings } from '../store/aiSettings.js';
 import CustomSelect from '../components/CustomSelect.jsx';
 import appLogo from '../assets/openexam-logo.png';
+import { useDialog } from '../components/DialogProvider.jsx';
 
 const RESETTABLE_LOCAL_KEYS = ['openexam_settings', 'openexam_onboarding_done_v1', 'openexam_ai_active_session', 'openexam_question_context'];
 
@@ -32,6 +33,7 @@ export default function Settings({ onBack }) {
   const [updateState, setUpdateState] = useState(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [backupBusy, setBackupBusy] = useState('');
+  const { alert: showAlert, confirm: showConfirm, toast: showToast } = useDialog();
 
   useEffect(() => {
     let mounted = true;
@@ -124,12 +126,16 @@ export default function Settings({ onBack }) {
       console.error('写入 SQLite 配置失败:', error);
       setPersistStatus('local');
     }
+    showToast({ title: '配置已保存', message: persistStatus === 'sqlite' ? '已同步写入本地数据库。' : '已保存到本地缓存。', tone: 'success' });
     setTestStatus('saved');
     setTimeout(() => setTestStatus(null), 2000);
   };
 
   const handleTest = async () => {
-    if (!settings.apiKey || !settings.aiProvider) { alert('请先配置 API Key 和服务商'); return; }
+    if (!settings.apiKey || !settings.aiProvider) {
+      await showAlert({ title: '缺少 AI 配置', message: '请先填写 API Key 并选择服务商。', tone: 'warning' });
+      return;
+    }
     setTestStatus('testing');
     try {
       if (window.openexam?.ai) {
@@ -146,12 +152,19 @@ export default function Settings({ onBack }) {
         if (window.openexam?.db?.saveAIConnectionState) {
           await window.openexam.db.saveAIConnectionState(state);
         }
-        if (result.success) setTestStatus('success');
-        else { setTestStatus('error'); console.error('连接失败:', result.error); }
+        if (result.success) {
+          showToast({ title: '连接成功', message: '当前 AI 服务已验证可用。', tone: 'success' });
+          setTestStatus('success');
+        } else {
+          showToast({ title: '连接失败', message: result.error || '未知错误', tone: 'danger' });
+          setTestStatus('error'); console.error('连接失败:', result.error);
+        }
       } else {
+        showToast({ title: '连接成功', message: '当前环境已通过连接测试。', tone: 'success' });
         setTestStatus('success');
       }
     } catch (e) {
+      showToast({ title: '测试失败', message: e?.message || '未知错误', tone: 'danger' });
       setTestStatus('error');
       console.error('测试连接失败:', e);
     }
@@ -192,7 +205,7 @@ export default function Settings({ onBack }) {
       const result = await window.openexam.app.checkForUpdates();
       setUpdateState(result || null);
     } catch (error) {
-      alert(`检查更新失败：${error.message || '未知错误'}`);
+      await showAlert({ title: '检查更新失败', message: error.message || '未知错误', tone: 'warning' });
     } finally {
       setCheckingUpdate(false);
     }
@@ -288,12 +301,12 @@ export default function Settings({ onBack }) {
       if (window.openexam?.db?.exportBackupFile) {
         const result = await window.openexam.db.exportBackupFile(collectBackupClientState());
         if (result?.canceled) return;
-        alert(`导出成功：${result?.filePath || '备份文件已保存'}`);
+        await showAlert({ title: '导出成功', message: result?.filePath || '备份文件已保存', tone: 'success' });
         return;
       }
 
       if (!window.openexam?.db?.exportAllData) {
-        alert('当前环境不支持导出');
+        await showAlert({ title: '暂不支持', message: '当前环境不支持导出。', tone: 'warning' });
         return;
       }
 
@@ -313,9 +326,9 @@ export default function Settings({ onBack }) {
       link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
-      alert(`导出成功：${filename}`);
+      await showAlert({ title: '导出成功', message: filename, tone: 'success' });
     } catch (error) {
-      alert(`导出失败：${error.message || '未知错误'}`);
+      await showAlert({ title: '导出失败', message: error.message || '未知错误', tone: 'danger' });
     } finally {
       setBackupBusy('');
     }
@@ -324,11 +337,17 @@ export default function Settings({ onBack }) {
   const handleImportBackupData = async () => {
     if (backupBusy) return;
     if (!window.openexam?.db?.importBackupFile) {
-      alert('当前环境不支持导入');
+      await showAlert({ title: '暂不支持', message: '当前环境不支持导入。', tone: 'warning' });
       return;
     }
 
-    const confirmed = window.confirm('导入备份会覆盖当前用户数据、练习历史、错题、本地会话和自定义内容，是否继续？');
+    const confirmed = await showConfirm({
+      title: '导入备份',
+      message: '导入备份会覆盖当前用户数据、练习历史、错题、本地会话和自定义内容，是否继续？',
+      confirmText: '继续导入',
+      cancelText: '取消',
+      tone: 'warning',
+    });
     if (!confirmed) return;
 
     try {
@@ -336,10 +355,14 @@ export default function Settings({ onBack }) {
       const result = await window.openexam.db.importBackupFile();
       if (result?.canceled) return;
       restoreBackupClientState(result?.clientState || {});
-      alert(`导入成功：已恢复 ${result?.stats?.papers || 0} 套试卷、${result?.stats?.questions || 0} 道题，应用将立即刷新。`);
+      await showAlert({
+        title: '导入成功',
+        message: `已恢复 ${result?.stats?.papers || 0} 套试卷、${result?.stats?.questions || 0} 道题，应用将立即刷新。`,
+        tone: 'success',
+      });
       window.location.reload();
     } catch (error) {
-      alert(`导入失败：${error.message || '未知错误'}`);
+      await showAlert({ title: '导入失败', message: error.message || '未知错误', tone: 'danger' });
     } finally {
       setBackupBusy('');
     }
@@ -347,20 +370,30 @@ export default function Settings({ onBack }) {
 
   const handleResetUserData = async () => {
     if (!window.openexam?.db?.resetUserData) {
-      alert('当前环境不支持重置用户数据');
+      await showAlert({ title: '暂不支持', message: '当前环境不支持重置用户数据。', tone: 'warning' });
       return;
     }
 
-    const confirmed = window.confirm('该操作会保留题库，但会清空练习进度、错题、本地 AI 会话、设置和自定义内容，恢复到首次打开状态。是否继续？');
+    const confirmed = await showConfirm({
+      title: '重置用户数据',
+      message: '该操作会保留题库，但会清空练习进度、错题、本地 AI 会话、设置和自定义内容，恢复到首次打开状态。是否继续？',
+      confirmText: '确认重置',
+      cancelText: '取消',
+      tone: 'danger',
+    });
     if (!confirmed) return;
 
     try {
       const result = await window.openexam.db.resetUserData();
       RESETTABLE_LOCAL_KEYS.forEach((key) => localStorage.removeItem(key));
-      alert(`已重置为新用户状态，题库保留 ${result?.preserved?.papers || 0} 套 / ${result?.preserved?.questions || 0} 题`);
+      await showAlert({
+        title: '已重置成功',
+        message: `已重置为新用户状态，题库保留 ${result?.preserved?.papers || 0} 套 / ${result?.preserved?.questions || 0} 题`,
+        tone: 'success',
+      });
       window.location.reload();
     } catch (error) {
-      alert(`重置失败：${error.message || '未知错误'}`);
+      await showAlert({ title: '重置失败', message: error.message || '未知错误', tone: 'danger' });
     }
   };
 

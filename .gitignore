@@ -24,3 +24,8 @@ npm-debug.log*
 
 # Desktop release output
 release/
+# Local seed database
+data/openexam.seed.db
+data/openexam.seed.db-wal
+data/openexam.seed.db-shm
+data/saduck-papers.json

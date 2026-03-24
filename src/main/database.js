@@ -1,5 +1,7 @@
 const Database = require('better-sqlite3');
+const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const { app } = require('electron');
 const { normalizeQuestionTaxonomy, isFakeQuestion } = require('../shared/questionCategory');
 const achievementCatalog = require('../shared/achievementCatalog.json');
@@ -9,6 +11,48 @@ let db = null;
 const REVIEW_INTERVAL_DAYS = [0, 1, 2, 4, 7, 15, 30];
 const USER_GENERATED_PAPER_TYPES = ['imported', 'ai_exam', 'ai_practice'];
 const USER_GENERATED_PAPER_TYPE_SQL = USER_GENERATED_PAPER_TYPES.map((type) => `\'${type}\'`).join(', ');
+
+function removeDatabaseArtifacts(dbPath) {
+  ['', '-wal', '-shm'].forEach((suffix) => {
+    const target = `${dbPath}${suffix}`;
+    if (fs.existsSync(target)) fs.unlinkSync(target);
+  });
+}
+
+function getBundledDatabaseCandidates() {
+  const devDataPath = path.join(__dirname, '..', '..', 'data');
+  const candidates = [
+    process.resourcesPath ? path.join(process.resourcesPath, 'openexam.seed.db.gz') : '',
+    process.resourcesPath ? path.join(process.resourcesPath, 'openexam.seed.db') : '',
+    path.join(devDataPath, 'openexam.seed.db.gz'),
+    path.join(devDataPath, 'openexam.seed.db'),
+  ];
+  return candidates.filter(Boolean);
+}
+
+function bootstrapBundledDatabase(dbPath) {
+  if (fs.existsSync(dbPath)) return false;
+
+  for (const candidate of getBundledDatabaseCandidates()) {
+    if (!fs.existsSync(candidate)) continue;
+    try {
+      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+      removeDatabaseArtifacts(dbPath);
+      if (candidate.endsWith('.gz')) {
+        fs.writeFileSync(dbPath, zlib.gunzipSync(fs.readFileSync(candidate)));
+      } else {
+        fs.copyFileSync(candidate, dbPath);
+      }
+      console.log(`使用内置题库初始化数据库: ${candidate}`);
+      return true;
+    } catch (error) {
+      console.error(`初始化内置题库失败: ${candidate}`, error);
+      removeDatabaseArtifacts(dbPath);
+    }
+  }
+
+  return false;
+}
 
 function toSQLiteDateTime(input = new Date()) {
   const date = input instanceof Date ? input : new Date(input);
@@ -158,6 +202,9 @@ function ensureQuestionsSchema() {
 function initDatabase() {
   const userDataPath = app.getPath('userData');
   const dbPath = path.join(userDataPath, 'openexam.db');
+
+  fs.mkdirSync(userDataPath, { recursive: true });
+  bootstrapBundledDatabase(dbPath);
 
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');

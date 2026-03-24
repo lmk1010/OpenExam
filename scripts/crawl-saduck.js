@@ -1,7 +1,6 @@
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
 const { localizePapers } = require('./saduck-assets');
+const { buildSeedDatabase, getUserDbPath, syncOfficialQuestionBank } = require('./saduck-db');
 
 const TOKEN = process.env.SADUCK_TOKEN || '';
 const AES_KEY_DECRYPT = '7SyqrN6925ZYb636';
@@ -190,12 +189,20 @@ async function main() {
   const localized = await localizePapers(allPapers);
   console.log(`题图本地化完成: ${localized.assetCount} 个资源${localized.failed.length ? `，失败 ${localized.failed.length} 个` : ''}`);
 
-  const outputPath = path.join(__dirname, '../data/saduck-papers.json');
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, JSON.stringify(allPapers, null, 2));
+  console.log('\n开始生成 SQLite 种子库...');
+  const seedResult = buildSeedDatabase(allPapers, {
+    logger: (message) => console.log(`  ${message}`),
+  });
+  console.log(`种子库完成: ${seedResult.totalPapers} 套试卷，${seedResult.totalQuestions} 道题目`);
+  console.log(`种子文件: ${seedResult.gzipPath}`);
 
-  console.log(`\n完成，共保存 ${allPapers.length} 套试卷`);
-  console.log(`输出文件: ${outputPath}`);
+  console.log('\n开始同步本地用户题库...');
+  const syncResult = syncOfficialQuestionBank(allPapers, {
+    dbPath: getUserDbPath(),
+    logger: (message) => console.log(`  ${message}`),
+  });
+  console.log(`本地题库同步完成: ${syncResult.totalPapers} 套试卷，${syncResult.totalQuestions} 道题目`);
+  console.log(`数据库文件: ${syncResult.dbPath}`);
 }
 
 main().catch((error) => {

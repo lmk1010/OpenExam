@@ -13,7 +13,9 @@
     "dist:mac": "npm run build && electron-builder --mac dmg zip",
     "dist:win": "npm run build && electron-builder --win nsis",
     "rebuild:electron": "electron-builder install-app-deps",
-    "localize:saduck-assets": "node scripts/localize-saduck-assets.js"
+    "crawl:saduck": "ELECTRON_RUN_AS_NODE=1 electron scripts/crawl-saduck.js",
+    "build:saduck-seed": "ELECTRON_RUN_AS_NODE=1 electron scripts/build-saduck-seed.js",
+    "sync:saduck-seed": "ELECTRON_RUN_AS_NODE=1 electron scripts/import-saduck.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.72.1",
@@ -84,6 +86,10 @@
     ],
     "electronUpdaterCompatibility": ">=2.16",
     "extraResources": [
+      {
+        "from": "data/openexam.seed.db.gz",
+        "to": "openexam.seed.db.gz"
+      },
       {
         "from": "data/question-assets",
         "to": "question-assets",

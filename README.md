@@ -141,4 +141,7 @@ xattr -dr com.apple.quarantine /Applications/OpenExam.app
 
 ## License
 
-MIT
+GPL-3.0-or-later
+
+- 本仓库代码采用 GNU GPL v3 或更高版本授权。
+- 第三方题库数据、图片资源与外部抓取内容不默认归入 GPL 授权范围，需遵循其各自来源与许可说明。

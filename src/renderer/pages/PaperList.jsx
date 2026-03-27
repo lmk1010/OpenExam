@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { actions } from '../store/examStore.js';
 import CustomSelect from '../components/CustomSelect.jsx';
 import { buildPaperShareText, copyText } from '../utils/paperShare.js';
@@ -81,32 +81,71 @@ function getPaperBadge(paper) {
   }
 }
 
-function getPaperActionLabel(paper) {
+function getPaperActionLabel(paper, hasResumeRecord = false) {
+  if (hasResumeRecord) return '继续作答';
   return paper?.type === 'ai_practice' ? '开始练习' : '开始答题';
 }
 
-export default function PaperList({ onOpenPaper }) {
+function hasAnyAnswer(record) {
+  if (!record?.answers || typeof record.answers !== 'object') return false;
+  return Object.values(record.answers).some((value) => {
+    if (Array.isArray(value)) return value.length > 0;
+    if (value && typeof value === 'object') {
+      const raw = value.userAnswer ?? value.answer ?? '';
+      return String(raw).trim().length > 0;
+    }
+    return String(value || '').trim().length > 0;
+  });
+}
+
+export default function PaperList({ onOpenPaper, initialKeyword = '', focusToken = 0 }) {
   const [papers, setPapers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedProvince, setSelectedProvince] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
+  const [selectedSubject, setSelectedSubject] = useState('all');
+  const [keyword, setKeyword] = useState(initialKeyword);
   const [currentPage, setCurrentPage] = useState(1);
   const [busyAction, setBusyAction] = useState('');
+  const [resumableMap, setResumableMap] = useState({});
   const { toast: showToast } = useDialog();
+  const keywordInputRef = useRef(null);
 
   // 加载试卷
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      const data = await actions.loadPapers();
-      setPapers(data);
+      const [paperData, recordData] = await Promise.all([
+        actions.loadPapers(),
+        window.openexam?.db?.getPracticeRecords ? window.openexam.db.getPracticeRecords() : Promise.resolve([]),
+      ]);
+      setPapers(paperData);
+      const nextResumable = {};
+      (recordData || []).forEach((record) => {
+        if (!record?.paper_id || nextResumable[record.paper_id]) return;
+        const status = String(record.status || '').toLowerCase();
+        if (!['ongoing', 'paused'].includes(status) || !hasAnyAnswer(record)) return;
+        nextResumable[record.paper_id] = record;
+      });
+      setResumableMap(nextResumable);
       setLoading(false);
     };
     loadData();
   }, []);
 
-  // 获取可用年份
-  const years = [...new Set(papers.map(p => p.year))].sort((a, b) => b - a);
+  useEffect(() => {
+    setKeyword(initialKeyword || '');
+  }, [initialKeyword]);
+
+  useEffect(() => {
+    if (!focusToken) return;
+    keywordInputRef.current?.focus();
+  }, [focusToken]);
+
+  // 获取可用筛选项
+  const years = useMemo(() => [...new Set(papers.map(p => p.year))].sort((a, b) => b - a), [papers]);
+  const subjects = useMemo(() => [...new Set(papers.map(p => String(p.subject || '').trim()).filter(Boolean))], [papers]);
+  const normalizedKeyword = String(keyword || '').trim().toLowerCase();
 
   // 筛选试卷
   const filteredPapers = papers.filter(p => {
@@ -120,6 +159,19 @@ export default function PaperList({ onOpenPaper }) {
     }
     // 年份筛选
     if (selectedYear !== 'all' && p.year !== parseInt(selectedYear)) return false;
+    // 科目筛选
+    if (selectedSubject !== 'all' && String(p.subject || '') !== selectedSubject) return false;
+    // 关键词搜索
+    if (normalizedKeyword) {
+      const haystack = [
+        p.title,
+        p.province,
+        normalizePaperProvince(p.province),
+        p.subject,
+        String(p.year || ''),
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(normalizedKeyword)) return false;
+    }
     return true;
   });
 
@@ -133,10 +185,13 @@ export default function PaperList({ onOpenPaper }) {
   // 筛选变化时重置页码
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedProvince, selectedYear]);
+  }, [selectedProvince, selectedYear, selectedSubject, normalizedKeyword]);
 
   const handleStart = async (paper) => {
-    onOpenPaper?.(paper);
+    onOpenPaper?.({
+      ...paper,
+      resumeRecord: resumableMap[paper.id] || null,
+    });
   };
 
   const handleExportPaper = async (paper) => {
@@ -209,6 +264,35 @@ export default function PaperList({ onOpenPaper }) {
               ]}
             />
           </div>
+          <span className="filter-label">科目</span>
+          <div className="custom-select">
+            <CustomSelect
+              value={selectedSubject}
+              onChange={(nextValue) => setSelectedSubject(nextValue)}
+              options={[
+                { value: 'all', label: '全部科目' },
+                ...subjects.map((subject) => ({ value: subject, label: subject })),
+              ]}
+            />
+          </div>
+          <input
+            ref={keywordInputRef}
+            type="text"
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder="搜索标题/地区/年份"
+            style={{
+              width: 210,
+              height: 34,
+              borderRadius: 8,
+              border: '1px solid var(--line)',
+              background: 'var(--surface)',
+              color: 'var(--text)',
+              fontSize: 13,
+              padding: '0 10px',
+              outline: 'none',
+            }}
+          />
         </div>
         <div className="filter-right">
           <span className="result-count">共 {filteredPapers.length} 套试卷</span>
@@ -219,6 +303,7 @@ export default function PaperList({ onOpenPaper }) {
       <div className="paper-grid">
         {paginatedPapers.map(paper => {
           const badge = getPaperBadge(paper);
+          const hasResumeRecord = Boolean(resumableMap[paper.id]);
           return (
           <div key={paper.id} className="paper-card">
             <div className="paper-card-header">
@@ -247,7 +332,7 @@ export default function PaperList({ onOpenPaper }) {
                 className="paper-start-btn paper-action-btn paper-action-btn--primary"
                 onClick={() => handleStart(paper)}
               >
-                {getPaperActionLabel(paper)}
+                {getPaperActionLabel(paper, hasResumeRecord)}
               </button>
               <button
                 className="paper-action-btn paper-action-btn--accent"

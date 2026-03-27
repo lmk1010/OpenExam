@@ -28,6 +28,31 @@ const notify = () => {
 // 检查是否在 Electron 环境
 const isElectron = () => window.openexam?.db;
 
+const toMultipleKeys = (value) => {
+  if (Array.isArray(value)) return [...new Set(value.map(v => String(v || '').trim()).filter(Boolean))].sort();
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+  if (/^[A-Z]+$/i.test(raw) && raw.length > 1) return [...new Set(raw.toUpperCase().split('').filter(Boolean))].sort();
+  return [...new Set(raw.split(/[,，\s|/]+/).map(v => v.trim()).filter(Boolean))].sort();
+};
+
+const isCorrectAnswer = (userAnswer, correctAnswer, type) => {
+  if (type === 'multiple') {
+    const ua = toMultipleKeys(userAnswer);
+    const ca = toMultipleKeys(correctAnswer);
+    return ua.length === ca.length && ua.every((item, idx) => item === ca[idx]);
+  }
+  return String(userAnswer || '').trim() === String(correctAnswer || '').trim();
+};
+
+const formatAnswer = (answer, type) => {
+  if (type === 'multiple') {
+    const keys = toMultipleKeys(answer);
+    return keys.length ? keys.join(',') : '';
+  }
+  return String(answer || '').trim();
+};
+
 export const actions = {
   // 加载试卷列表
   loadPapers: async () => {
@@ -92,12 +117,12 @@ export const actions = {
 
     questions.forEach(q => {
       const userAnswer = state.currentAnswers[q.id]?.answer;
-      const isCorrect = userAnswer === q.answer;
+      const isCorrect = isCorrectAnswer(userAnswer, q.answer, q.type);
       if (isCorrect) correctCount++;
 
       answerDetails[q.id] = {
         userAnswer,
-        correctAnswer: q.answer,
+        correctAnswer: formatAnswer(q.answer, q.type),
         isCorrect,
         time: state.currentAnswers[q.id]?.time
       };
@@ -107,8 +132,8 @@ export const actions = {
         window.openexam.db.addWrongQuestion({
           questionId: q.id,
           paperId: state.currentPaper.id,
-          userAnswer,
-          correctAnswer: q.answer
+          userAnswer: formatAnswer(userAnswer, q.type),
+          correctAnswer: formatAnswer(q.answer, q.type)
         });
       }
     });

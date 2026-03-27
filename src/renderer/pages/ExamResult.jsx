@@ -12,6 +12,40 @@ const categoryNames = {
 
 const categoryOrder = ['yanyu', 'shuliang', 'panduan', 'ziliao', 'changshi'];
 
+const toMultipleKeys = (value) => {
+  if (Array.isArray(value)) return [...new Set(value.map(v => String(v || '').trim()).filter(Boolean))].sort();
+  if (value && typeof value === 'object') return toMultipleKeys(value.userAnswer ?? value.answer ?? '');
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+  if (/^[A-Z]+$/i.test(raw) && raw.length > 1) return [...new Set(raw.toUpperCase().split('').filter(Boolean))].sort();
+  return [...new Set(raw.split(/[,，\s|/]+/).map(v => v.trim()).filter(Boolean))].sort();
+};
+
+const normalizeAnswerByType = (value, type) => {
+  if (type === 'multiple') return toMultipleKeys(value);
+  if (value && typeof value === 'object') return String(value.userAnswer ?? value.answer ?? '').trim();
+  return String(value || '').trim();
+};
+
+const isAnswered = (value, type) => (type === 'multiple' ? Array.isArray(value) && value.length > 0 : Boolean(String(value || '').trim()));
+
+const isCorrectAnswer = (userAnswer, correctAnswer, type) => {
+  if (type === 'multiple') {
+    const ua = toMultipleKeys(userAnswer);
+    const ca = toMultipleKeys(correctAnswer);
+    return ua.length === ca.length && ua.every((item, idx) => item === ca[idx]);
+  }
+  return String(userAnswer || '').trim() === String(correctAnswer || '').trim();
+};
+
+const formatAnswer = (answer, type) => {
+  if (type === 'multiple') {
+    const keys = toMultipleKeys(answer);
+    return keys.length ? keys.join(',') : '';
+  }
+  return String(answer || '').trim();
+};
+
 const TrendChart = ({ data, color = 'var(--accent)' }) => {
   const points = data.length > 0 ? data : [50, 60, 45, 70, 65, 80, 75];
   const max = Math.max(...points, 100);
@@ -53,16 +87,10 @@ export default function ExamResult({ result, onBack }) {
 
   const questions = result?.questions || getState().currentQuestions || [];
   const rawAnswers = result?.answers || {};
+  const questionTypeMap = new Map(questions.map((q) => [q.id, q.type]));
   const answers = Object.entries(rawAnswers).reduce((acc, [questionId, value]) => {
-    if (typeof value === 'string') {
-      acc[questionId] = value;
-      return acc;
-    }
-    if (value && typeof value === 'object') {
-      acc[questionId] = value.userAnswer || value.answer || '';
-      return acc;
-    }
-    acc[questionId] = '';
+    const qType = questionTypeMap.get(questionId) || 'single';
+    acc[questionId] = normalizeAnswerByType(value, qType);
     return acc;
   }, {});
   const currentQuestion = questions[currentIndex];
@@ -74,7 +102,7 @@ export default function ExamResult({ result, onBack }) {
       categoryStats[cat] = { total: 0, correct: 0 };
     }
     categoryStats[cat].total++;
-    if (answers[q.id] === q.answer) {
+    if (isCorrectAnswer(answers[q.id], q.answer, q.type)) {
       categoryStats[cat].correct++;
     }
   });
@@ -110,9 +138,9 @@ export default function ExamResult({ result, onBack }) {
   const totalCount = result?.totalCount || questions.length;
   const correctCount = result?.correctCount || Object.keys(answers).filter(id => {
     const q = questions.find(item => item.id === id);
-    return q && answers[id] === q.answer;
+    return q && isCorrectAnswer(answers[id], q.answer, q.type);
   }).length;
-  const answeredCount = questions.filter(q => Boolean(answers[q.id])).length;
+  const answeredCount = questions.filter(q => isAnswered(answers[q.id], q.type)).length;
   const unansweredCount = result?.unanswered ?? Math.max(totalCount - answeredCount, 0);
   const accuracy = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
   const timeElapsed = result?.timeElapsed || result?.duration || 0;
@@ -167,7 +195,11 @@ export default function ExamResult({ result, onBack }) {
 
   if (showAnalysis && currentQuestion) {
     const userAnswer = answers[currentQuestion.id];
-    const isCorrect = userAnswer === currentQuestion.answer;
+    const isCorrect = isCorrectAnswer(userAnswer, currentQuestion.answer, currentQuestion.type);
+    const userAnswerText = formatAnswer(userAnswer, currentQuestion.type);
+    const correctAnswerText = formatAnswer(currentQuestion.answer, currentQuestion.type);
+    const selectedKeys = currentQuestion.type === 'multiple' ? toMultipleKeys(userAnswer) : [userAnswer].filter(Boolean);
+    const correctKeys = currentQuestion.type === 'multiple' ? toMultipleKeys(currentQuestion.answer) : [currentQuestion.answer].filter(Boolean);
 
     return (
       <div className="analysis-page">
@@ -187,8 +219,8 @@ export default function ExamResult({ result, onBack }) {
           </div>
 
           <div className="answer-compare">
-            <span>你的答案: <strong className={isCorrect ? 'correct' : 'wrong'}>{userAnswer || '未作答'}</strong></span>
-            <span>正确答案: <strong className="correct">{currentQuestion.answer}</strong></span>
+            <span>你的答案: <strong className={isCorrect ? 'correct' : 'wrong'}>{userAnswerText || '未作答'}</strong></span>
+            <span>正确答案: <strong className="correct">{correctAnswerText}</strong></span>
           </div>
 
           <RichQuestionContent value={currentQuestion.content_html || currentQuestion.content} className="question-content" />
@@ -197,7 +229,7 @@ export default function ExamResult({ result, onBack }) {
             {currentQuestion.options.map(opt => (
               <div
                 key={opt.key}
-                className={`option-item ${opt.key === currentQuestion.answer ? 'correct-answer' : ''} ${opt.key === userAnswer && !isCorrect ? 'wrong-answer' : ''}`}
+                className={`option-item ${correctKeys.includes(opt.key) ? 'correct-answer' : ''} ${selectedKeys.includes(opt.key) && !correctKeys.includes(opt.key) ? 'wrong-answer' : ''}`}
               >
                 <span className="option-key">{opt.key}</span>
                 <RichQuestionContent value={opt.content} className="option-content rich-question-option" />
@@ -448,8 +480,8 @@ export default function ExamResult({ result, onBack }) {
                 </div>
                 <div className="answer-dots-full dense">
                   {questions.map((question, index) => {
-                    const answered = Boolean(answers[question.id]);
-                    const correct = answers[question.id] === question.answer;
+                    const answered = isAnswered(answers[question.id], question.type);
+                    const correct = isCorrectAnswer(answers[question.id], question.answer, question.type);
                     return (
                       <span
                         key={question.id}

@@ -31,7 +31,12 @@ const formatShort = (value) => {
 const stageMeta = (stage = 0) => STAGES[Math.max(0, Math.min(stage, STAGES.length - 1))];
 const sortByUrgency = (a, b) => (Number(b.is_due) - Number(a.is_due)) || ((parseTime(a.next_review_at)?.getTime() || 0) - (parseTime(b.next_review_at)?.getTime() || 0)) || ((parseTime(b.added_at)?.getTime() || 0) - (parseTime(a.added_at)?.getTime() || 0));
 
-export default function WrongBook() {
+const normalizeOptions = (options) => Array.isArray(options) ? options.map((opt) => ({
+  key: String(opt?.key || ""),
+  content: String(opt?.content || ""),
+})).filter((opt) => opt.key) : [];
+
+export default function WrongBook({ onRedo }) {
   const [list, setList] = useState([]), [loading, setLoading] = useState(true), [filter, setFilter] = useState("due"), [expandedId, setExpandedId] = useState(null), [busyId, setBusyId] = useState(""), [error, setError] = useState("");
   const loadList = async () => {
     if (!window.openexam?.db?.getWrongQuestions) return setLoading(false);
@@ -51,6 +56,35 @@ export default function WrongBook() {
 
   const filtered = useMemo(() => list.filter((item) => filter === "all" || (filter === "due" && item.is_due) || (filter === "learning" && !item.is_due && (item.review_stage || 0) < STAGES.length - 1) || (filter === "mastered" && !item.is_due && (item.review_stage || 0) >= STAGES.length - 1)).sort(sortByUrgency), [list, filter]);
   const focusDue = () => { setFilter("due"); const first = list.find((item) => item.is_due); if (first) setExpandedId(first.id); };
+  const startRedo = () => {
+    if (typeof onRedo !== "function") return;
+    const source = filtered.length ? filtered : list;
+    const seen = new Set();
+    const questions = source.map((item, index) => {
+      const id = String(item.question_id || item.id || `wrong_redo_${index}`);
+      if (seen.has(id)) return null;
+      seen.add(id);
+      return {
+        id,
+        type: item.type || "single",
+        category: item.category || "",
+        sub_category: item.sub_category || "",
+        content: item.content || "",
+        content_html: item.content_html || "",
+        options: normalizeOptions(item.options),
+        answer: item.answer || item.correct_answer || "",
+        analysis: item.analysis || "",
+        analysis_html: item.analysis_html || "",
+        paper_id: item.paper_id || null,
+      };
+    }).filter((item) => item && item.content && item.answer && item.options.length > 0);
+
+    if (!questions.length) {
+      setError("当前筛选下没有可重做的完整题目");
+      return;
+    }
+    onRedo(questions, { filter, count: questions.length });
+  };
   const updateReview = async (item, outcome) => {
     if (!window.openexam?.db?.reviewWrongQuestion) return;
     const key = `${item.id}:${outcome}`; setBusyId(key); setError("");
@@ -82,7 +116,12 @@ export default function WrongBook() {
 
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{FILTERS.map((item) => <button key={item.key} onClick={() => setFilter(item.key)} style={{ padding: "8px 14px", borderRadius: 999, border: filter === item.key ? "1px solid var(--accent-border-soft)" : "1px solid var(--line)", background: filter === item.key ? "var(--accent-soft-bg)" : "var(--surface)", color: filter === item.key ? "var(--accent)" : "var(--muted)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{item.label}</button>)}</div>
-      <div style={{ fontSize: 12, color: "var(--muted)" }}>按复习紧急度排序 · {filtered.length} 道</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 12, color: "var(--muted)" }}>按复习紧急度排序 · {filtered.length} 道</div>
+        <button onClick={startRedo} disabled={!list.length} style={{ padding: "8px 14px", borderRadius: 12, border: "1px solid var(--accent-border-soft)", background: "var(--accent-soft-bg)", color: "var(--accent)", fontSize: 12, fontWeight: 700, cursor: list.length ? "pointer" : "not-allowed", opacity: list.length ? 1 : 0.55 }}>
+          按当前筛选重做
+        </button>
+      </div>
     </div>
     {error && <div style={{ padding: "11px 14px", borderRadius: 14, border: "1px solid var(--danger-border)", background: "var(--danger-soft)", color: "var(--danger)", fontSize: 12 }}>{error}</div>}
     {loading ? <div style={{ padding: "80px 0", textAlign: "center", color: "var(--muted)" }}>错题加载中…</div> : filtered.length === 0 ? <div style={{ padding: "90px 0", textAlign: "center", color: "var(--muted)", border: "1px dashed var(--line)", borderRadius: 20 }}>当前筛选下暂无错题，状态很棒。</div> : <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>{filtered.map((item) => {

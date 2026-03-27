@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import RichQuestionContent from '../components/RichQuestionContent.jsx';
 import { useDialog } from '../components/DialogProvider.jsx';
-import { getState, actions } from '../store/examStore.js';
+import { getState } from '../store/examStore.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const CAT_NAMES = {
@@ -28,8 +28,55 @@ const Ico = ({ d, size = 14, sw = 1.8, col = 'currentColor', extra }) => (
   </svg>
 );
 
+const toMultipleKeys = (value) => {
+  if (Array.isArray(value)) return [...new Set(value.map(v => String(v || '').trim()).filter(Boolean))].sort();
+  if (value && typeof value === 'object') return toMultipleKeys(value.userAnswer ?? value.answer ?? '');
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+  if (/^[A-Z]+$/i.test(raw) && raw.length > 1) {
+    return [...new Set(raw.toUpperCase().split('').filter(Boolean))].sort();
+  }
+  return [...new Set(raw.split(/[,，\s|/]+/).map(v => v.trim()).filter(Boolean))].sort();
+};
+
+const normalizeAnswerByType = (value, type) => {
+  if (type === 'multiple') return toMultipleKeys(value);
+  if (value && typeof value === 'object') return String(value.userAnswer ?? value.answer ?? '').trim();
+  return String(value || '').trim();
+};
+
+const isAnswered = (value, type) => (type === 'multiple' ? Array.isArray(value) && value.length > 0 : Boolean(String(value || '').trim()));
+
+const isCorrectAnswer = (userAnswer, correctAnswer, type) => {
+  if (type === 'multiple') {
+    const ua = toMultipleKeys(userAnswer);
+    const ca = toMultipleKeys(correctAnswer);
+    return ua.length === ca.length && ua.every((item, idx) => item === ca[idx]);
+  }
+  return String(userAnswer || '').trim() === String(correctAnswer || '').trim();
+};
+
+const formatAnswerForDisplay = (answer, type) => {
+  if (type === 'multiple') {
+    const keys = toMultipleKeys(answer);
+    return keys.length ? keys.join(',') : '';
+  }
+  return String(answer || '').trim();
+};
+
+const normalizeSavedAnswers = (rawAnswers, allQuestions = []) => {
+  const normalized = {};
+  const questionTypeMap = new Map(allQuestions.map((q) => [q.id, q.type]));
+  Object.entries(rawAnswers || {}).forEach(([questionId, value]) => {
+    const qType = questionTypeMap.get(questionId) || 'single';
+    const next = normalizeAnswerByType(value, qType);
+    if (isAnswered(next, qType)) normalized[questionId] = next;
+  });
+  return normalized;
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function ExamRoom({ paperId, questions: propQuestions, config, onFinish, onExit }) {
+export default function ExamRoom({ paperId, questions: propQuestions, config, resumeRecord, onFinish, onExit }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers]           = useState({});
   const [timeElapsed, setTimeElapsed]   = useState(0);
@@ -37,10 +84,21 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
   const [paper, setPaper]               = useState(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [layoutMode, setLayoutMode]     = useState('split');
+  const [sessionId, setSessionId]       = useState(() => resumeRecord?.id || `record_${Date.now()}`);
+  const [sessionStartTime, setSessionStartTime] = useState(() => resumeRecord?.start_time || resumeRecord?.startTime || new Date().toISOString());
   const { confirm: showConfirm } = useDialog();
   const bodyRef = useRef(null);
+  const resumeAppliedRef = useRef(false);
+  const persistentPaperId = config?.sourcePaperId || paperId || null;
 
   useEffect(() => {
+    setSessionId(resumeRecord?.id || `record_${Date.now()}`);
+    setSessionStartTime(resumeRecord?.start_time || resumeRecord?.startTime || new Date().toISOString());
+    resumeAppliedRef.current = false;
+    setAnswers({});
+    setTimeElapsed(0);
+    setCurrentIndex(0);
+    setShowAnalysis(false);
     if (propQuestions?.length > 0) {
       setQuestions(propQuestions);
       setPaper({ title: config?.title || `${CAT_NAMES[config?.category] || '专项'}练习`, type: 'practice' });
@@ -68,7 +126,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
         options: Array.isArray(currentQuestion.options) ? currentQuestion.options : [],
         answer: currentQuestion.answer || '',
         analysis: currentQuestion.analysis || '',
-        userAnswer: answers[currentQuestion.id] || '',
+        userAnswer: formatAnswerForDisplay(answers[currentQuestion.id], currentQuestion.type),
         updatedAt: new Date().toISOString(),
       };
       localStorage.setItem('openexam_question_context', JSON.stringify(payload));
@@ -82,16 +140,86 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    if (resumeAppliedRef.current || !questions.length || !resumeRecord) return;
+    const restoredAnswers = normalizeSavedAnswers(resumeRecord.answers, questions);
+    const answeredIndexes = new Set(Object.keys(restoredAnswers));
+    const firstPendingIndex = questions.findIndex(q => !answeredIndexes.has(q.id));
+    setAnswers(restoredAnswers);
+    setTimeElapsed(Math.max(0, Number(resumeRecord.duration || 0)));
+    if (firstPendingIndex >= 0) setCurrentIndex(firstPendingIndex);
+    resumeAppliedRef.current = true;
+  }, [questions, resumeRecord]);
+
   const formatTime = s => {
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
     return `${h > 0 ? h.toString().padStart(2,'0') + ':' : ''}${m.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')}`;
   };
 
-  const handleSelect = key => {
-    const next = { ...answers, [currentQuestion.id]: key };
-    setAnswers(next);
-    if (paperId) actions.submitAnswer(currentQuestion.id, key);
+  const collectResultStats = (answerMap = answers) => {
+    let correctCount = 0;
+    let answeredCount = 0;
+    const wrongQuestions = [];
+    questions.forEach((q) => {
+      const userAnswer = answerMap[q.id];
+      if (!isAnswered(userAnswer, q.type)) return;
+      answeredCount++;
+      if (isCorrectAnswer(userAnswer, q.answer, q.type)) correctCount++;
+      else {
+        wrongQuestions.push({
+          questionId: q.id,
+          paperId: q.paper_id || persistentPaperId,
+          userAnswer: formatAnswerForDisplay(userAnswer, q.type),
+          correctAnswer: formatAnswerForDisplay(q.answer, q.type),
+        });
+      }
+    });
+    return { correctCount, answeredCount, wrongQuestions };
+  };
+
+  const persistProgress = async (status, answerMap = answers, elapsed = timeElapsed) => {
+    if (!window.openexam?.db?.savePracticeRecord) return;
+    const { correctCount } = collectResultStats(answerMap);
+    const totalCount = questions.length;
+    const accuracy = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+    await window.openexam.db.savePracticeRecord({
+      id: sessionId,
+      paperId: persistentPaperId,
+      category: config?.category || null,
+      subCategory: config?.subCategory || null,
+      startTime: sessionStartTime,
+      endTime: status === 'completed' ? new Date().toISOString() : null,
+      duration: elapsed,
+      status,
+      answers: answerMap,
+      correctCount,
+      totalCount,
+      accuracy,
+      score: accuracy,
+    });
+  };
+
+  const handleSelect = async (key) => {
+    if (!currentQuestion) return;
+    let nextAnswers = answers;
+    setAnswers((prev) => {
+      const next = { ...prev };
+      if (currentQuestion.type === 'multiple') {
+        const selected = toMultipleKeys(prev[currentQuestion.id]);
+        const exists = selected.includes(key);
+        const updated = exists ? selected.filter((item) => item !== key) : [...selected, key].sort();
+        if (updated.length) next[currentQuestion.id] = updated;
+        else delete next[currentQuestion.id];
+      } else {
+        next[currentQuestion.id] = key;
+      }
+      nextAnswers = next;
+      return next;
+    });
     setShowAnalysis(true);
+    if (persistentPaperId) {
+      try { await persistProgress('ongoing', nextAnswers); } catch (err) { console.error('保存进度失败:', err); }
+    }
   };
 
   const goPrev = () => { if (currentIndex > 0) { setCurrentIndex(i => i - 1); setShowAnalysis(isMemorizeMode); bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); } };
@@ -99,22 +227,13 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
   const goToQ  = i => { setCurrentIndex(i); setShowAnalysis(isMemorizeMode); bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); };
 
   const handleSubmit = async () => {
-    const unanswered = questions.length - Object.keys(answers).length;
+    const { correctCount, answeredCount, wrongQuestions } = collectResultStats();
+    const unanswered = questions.length - answeredCount;
+    const accuracy = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
     const doSubmit = async () => {
-      let correctCount = 0;
-      const wrongQuestions = [];
-      questions.forEach(q => {
-        if (answers[q.id] === q.answer) correctCount++;
-        else if (answers[q.id]) wrongQuestions.push({ questionId: q.id, paperId: q.paper_id || paperId, userAnswer: answers[q.id], correctAnswer: q.answer });
-      });
-      const result = { totalCount: questions.length, correctCount, wrongCount: Object.keys(answers).length - correctCount, unanswered, accuracy: Math.round((correctCount / questions.length) * 100), timeElapsed, answers, questions, config };
-      if (paperId) {
-        onFinish(await actions.finishExam());
-        return;
-      }
+      const result = { totalCount: questions.length, correctCount, wrongCount: answeredCount - correctCount, unanswered, accuracy, timeElapsed, answers, questions, config };
       try {
-        const recordId = `record_${Date.now()}`;
-        await window.openexam.db.savePracticeRecord({ id: recordId, paperId: config?.sourcePaperId || paperId || null, category: config?.category || null, subCategory: config?.subCategory || null, startTime: new Date(Date.now() - timeElapsed * 1000).toISOString(), endTime: new Date().toISOString(), duration: timeElapsed, status: 'completed', answers, correctCount, totalCount: questions.length, accuracy: result.accuracy, score: Math.round((correctCount / questions.length) * 100) });
+        await persistProgress('completed');
         for (const wq of wrongQuestions) await window.openexam.db.addWrongQuestion(wq);
       } catch (err) { console.error('保存失败:', err); }
       onFinish(result);
@@ -133,19 +252,23 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
   const handleExit = async () => {
     const confirmed = await showConfirm({
       title: '确认退出',
-      message: '当前答题进度将丢失，确定退出吗？',
-      confirmText: '退出答题',
+      message: persistentPaperId ? '会自动保存当前进度，下次可继续作答。确定退出吗？' : '当前答题进度将丢失，确定退出吗？',
+      confirmText: '保存并退出',
       cancelText: '继续作答',
-      tone: 'danger',
+      tone: persistentPaperId ? 'warning' : 'danger',
     });
-    if (confirmed) onExit();
+    if (!confirmed) return;
+    if (persistentPaperId) {
+      try { await persistProgress('paused'); } catch (err) { console.error('保存退出进度失败:', err); }
+    }
+    onExit();
   };
 
   if (!currentQuestion || questions.length === 0) {
     return <div style={{ display: 'grid', placeItems: 'center', height: '100vh', color: 'var(--muted)', fontSize: 13 }}>加载中…</div>;
   }
 
-  const answeredCount   = Object.keys(answers).length;
+  const answeredCount   = questions.filter(q => isAnswered(answers[q.id], q.type)).length;
   const progressPercent = Math.round((answeredCount / questions.length) * 100);
   const catPalette      = CAT_COLORS[currentQuestion?.category] || CAT_COLORS.default;
 
@@ -162,7 +285,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
     cat,
     name: CAT_NAMES[cat] || cat,
     total: qs.length,
-    done: qs.filter(q => answers[q.id]).length,
+    done: qs.filter(q => isAnswered(answers[q.id], q.type)).length,
     palette: CAT_COLORS[cat] || CAT_COLORS.default,
   }));
 
@@ -170,9 +293,11 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
   const renderOptions = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
       {currentQuestion.options.map(opt => {
-        const isSelected = answers[currentQuestion.id] === opt.key;
-        const isCorrect  = opt.key === currentQuestion.answer;
-        const showResult = isMemorizeMode || (answers[currentQuestion.id] && showAnalysis);
+        const selectedKeys = currentQuestion.type === 'multiple' ? toMultipleKeys(answers[currentQuestion.id]) : [answers[currentQuestion.id]].filter(Boolean);
+        const correctKeys = currentQuestion.type === 'multiple' ? toMultipleKeys(currentQuestion.answer) : [currentQuestion.answer].filter(Boolean);
+        const isSelected = selectedKeys.includes(opt.key);
+        const isCorrect  = correctKeys.includes(opt.key);
+        const showResult = isMemorizeMode || (isAnswered(answers[currentQuestion.id], currentQuestion.type) && showAnalysis);
 
         let border = '1px solid var(--line)', bg = 'var(--surface)', tagBg = 'var(--surface-soft)', tagCol = 'var(--muted)';
         if (showResult) {
@@ -201,12 +326,12 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
 
   // ── Analysis card ──
   const renderAnalysis = () => {
-    if (!isMemorizeMode && !(answers[currentQuestion.id] && showAnalysis)) return null;
-    const isRight = answers[currentQuestion.id] === currentQuestion.answer;
+    if (!isMemorizeMode && !(isAnswered(answers[currentQuestion.id], currentQuestion.type) && showAnalysis)) return null;
+    const isRight = isCorrectAnswer(answers[currentQuestion.id], currentQuestion.answer, currentQuestion.type);
     return (
       <div style={{ marginTop: 20, padding: '16px 18px', background: 'var(--accent-soft-bg)', borderRadius: 10, border: '1px solid var(--accent-border-soft)', animation: 'fadeIn 0.25s ease-out' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-          {answers[currentQuestion.id] ? (
+          {isAnswered(answers[currentQuestion.id], currentQuestion.type) ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 5, color: isRight ? 'var(--success)' : 'var(--danger)', background: isRight ? 'var(--success-soft)' : 'var(--danger-soft)' }}>
               {isRight
                 ? <><Ico d={<polyline points="20 6 9 17 4 12"/>} size={12} sw={2.5} col="var(--success)"/>回答正确</>
@@ -215,7 +340,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
             </span>
           ) : null}
           <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>
-            正确答案：<span style={{ color: 'var(--accent)', fontWeight: 700 }}>{currentQuestion.answer}</span>
+            正确答案：<span style={{ color: 'var(--accent)', fontWeight: 700 }}>{formatAnswerForDisplay(currentQuestion.answer, currentQuestion.type)}</span>
           </span>
         </div>
         {(currentQuestion.analysis_html || currentQuestion.analysis) && (
@@ -324,7 +449,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
               {Object.entries(grouped).map(([cat, qs]) => {
                 const pal = CAT_COLORS[cat] || CAT_COLORS.default;
                 const name = CAT_NAMES[cat] || cat;
-                const doneCnt = qs.filter(q => answers[q.id]).length;
+                const doneCnt = qs.filter(q => isAnswered(answers[q.id], q.type)).length;
                 return (
                   <div key={cat}>
                     {/* Category label */}
@@ -336,7 +461,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
                     {/* Grid of question buttons */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 5 }}>
                       {qs.map(q => {
-                        const isAnswered = !!answers[q.id];
+                        const isAnsweredFlag = isAnswered(answers[q.id], q.type);
                         const isCurrent  = q._idx === currentIndex;
                         return (
                           <button key={q.id} onClick={() => goToQ(q._idx)} title={`第 ${q._idx + 1} 题`}
@@ -347,7 +472,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
                               ...(isCurrent ? {
                                 border: `2px solid ${pal.color}`, background: pal.color, color: '#fff',
                                 boxShadow: '0 8px 18px rgba(15,23,42,0.1)',
-                              } : isAnswered ? {
+                              } : isAnsweredFlag ? {
                                 border: `1px solid ${pal.border}`, background: pal.bg, color: pal.color,
                               } : {
                                 border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--muted)',
@@ -470,7 +595,7 @@ export default function ExamRoom({ paperId, questions: propQuestions, config, on
                     pointerEvents: 'auto',
                     width: isCur ? 28 : 22, height: 22, borderRadius: 11,
                     border: isCur ? '2px solid var(--accent)' : '1px solid var(--line)',
-                    background: isCur ? 'var(--accent)' : answers[q.id] ? 'var(--accent-soft-bg)' : 'var(--surface)',
+                    background: isCur ? 'var(--accent)' : isAnswered(answers[q.id], q.type) ? 'var(--accent-soft-bg)' : 'var(--surface)',
                     color: isCur ? '#fff' : 'var(--muted)',
                     fontSize: 10, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
                   }}>

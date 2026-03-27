@@ -168,6 +168,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("学习中心");
   const [practiceQuestions, setPracticeQuestions] = useState(null); // 专项练习题目
   const [practiceConfig, setPracticeConfig] = useState(null); // 练习配置
+  const [examResumeRecord, setExamResumeRecord] = useState(null);
+  const [paperSearchKeyword, setPaperSearchKeyword] = useState("");
+  const [paperSearchFocusToken, setPaperSearchFocusToken] = useState(0);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingClosing, setOnboardingClosing] = useState(false);
@@ -345,16 +348,59 @@ export default function App() {
     practice: "题库练习",
     papers: "模拟考试",
     "ai-generate": "AI出卷",
+    "wrong-book": "",
   }[targetPage] || "学习中心");
+
+  const hasAnyAnswer = (record) => {
+    if (!record?.answers || typeof record.answers !== 'object') return false;
+    return Object.values(record.answers).some((value) => {
+      if (Array.isArray(value)) return value.length > 0;
+      if (value && typeof value === 'object') {
+        const raw = value.userAnswer ?? value.answer ?? '';
+        return String(raw).trim().length > 0;
+      }
+      return String(value || '').trim().length > 0;
+    });
+  };
+
+  const findResumableRecord = async (paperId) => {
+    if (!paperId || !window.openexam?.db?.getPracticeRecords) return null;
+    const records = await window.openexam.db.getPracticeRecords();
+    return (records || []).find((record) => (
+      record?.paper_id === paperId &&
+      ['ongoing', 'paused'].includes(String(record?.status || '').toLowerCase()) &&
+      hasAnyAnswer(record)
+    )) || null;
+  };
+
+  const archiveRecord = async (record) => {
+    if (!record?.id || !window.openexam?.db?.savePracticeRecord) return;
+    await window.openexam.db.savePracticeRecord({
+      id: record.id,
+      paperId: record.paper_id || record.paperId || null,
+      category: record.category || null,
+      subCategory: record.sub_category || record.subCategory || null,
+      startTime: record.start_time || record.startTime || new Date().toISOString(),
+      endTime: new Date().toISOString(),
+      duration: Number(record.duration || 0),
+      status: 'abandoned',
+      answers: record.answers || {},
+      correctCount: Number(record.correct_count || record.correctCount || 0),
+      totalCount: Number(record.total_count || record.totalCount || 0),
+      accuracy: Number(record.accuracy || 0),
+      score: Number(record.score || 0),
+    });
+  };
 
   const handleStartExam = async (paperId, options = {}) => {
     await actions.startExam(paperId);
+    setExamResumeRecord(options.resumeRecord || null);
     setCurrentPaperId(paperId);
     setResultReturnPage(options.returnPage || "papers");
     setPage("exam");
   };
 
-  const handleStartSavedPractice = async (paperId, paperTitle, returnPage = "practice") => {
+  const handleStartSavedPractice = async (paperId, paperTitle, returnPage = "practice", resumeRecord = null) => {
     if (!window.openexam?.db?.getQuestions) {
       await showAlert({ title: '无法开始练习', message: '数据库未连接，请稍后重试。', tone: 'warning' });
       return;
@@ -368,6 +414,7 @@ export default function App() {
       }
       setPracticeQuestions(questions);
       setPracticeConfig({ mode: 'practice', title: paperTitle || 'AI 自定义练习', sourcePaperId: paperId });
+      setExamResumeRecord(resumeRecord || null);
       setResultReturnPage(returnPage);
       setPage("practice-exam");
     } catch (err) {
@@ -379,14 +426,33 @@ export default function App() {
   const handleOpenPaper = async (paper, returnPage = "papers") => {
     const target = paper && typeof paper === 'object' ? paper : { id: paper };
     if (!target?.id) return;
+    let resumeRecord = target.resumeRecord || null;
+    if (!resumeRecord) {
+      try { resumeRecord = await findResumableRecord(target.id); } catch (error) { console.error('加载继续记录失败:', error); }
+    }
+    if (resumeRecord) {
+      const answeredCount = Object.keys(resumeRecord.answers || {}).length;
+      const continueResume = await showConfirm({
+        title: '检测到未完成作答',
+        message: `这套题有 ${answeredCount} 题已作答，是否继续上次进度？`,
+        confirmText: '继续作答',
+        cancelText: '重新开始',
+        tone: 'info',
+      });
+      if (!continueResume) {
+        try { await archiveRecord(resumeRecord); } catch (error) { console.error('更新旧记录状态失败:', error); }
+        resumeRecord = null;
+      }
+    }
     if (target.type === 'ai_practice') {
-      await handleStartSavedPractice(target.id, target.title, returnPage);
+      await handleStartSavedPractice(target.id, target.title, returnPage, resumeRecord);
       return;
     }
-    await handleStartExam(target.id, { returnPage });
+    await handleStartExam(target.id, { returnPage, resumeRecord });
   };
 
   const handleFinishExam = (result) => {
+    setExamResumeRecord(null);
     setExamResult(result);
     setPage("result");
   };
@@ -415,6 +481,7 @@ export default function App() {
 
       setPracticeQuestions(questions);
       setPracticeConfig({ ...config, category, subCategory });
+      setExamResumeRecord(null);
       setResultReturnPage("practice");
       setPage("practice-exam");
     } catch (err) {
@@ -423,8 +490,26 @@ export default function App() {
     }
   };
 
+  const handleStartWrongRedo = async (questions, meta = {}) => {
+    if (!Array.isArray(questions) || questions.length === 0) {
+      await showAlert({ title: '暂无可重做题目', message: '当前筛选下没有可重做的错题。', tone: 'info' });
+      return;
+    }
+    setPracticeQuestions(questions);
+    setPracticeConfig({
+      mode: 'wrong-redo',
+      title: `错题重做（${questions.length}题）`,
+      category: 'wrong-book',
+      filter: meta.filter || 'all',
+    });
+    setExamResumeRecord(null);
+    setResultReturnPage("wrong-book");
+    setPage("practice-exam");
+  };
+
   const handleExitExam = () => {
     actions.resetExam();
+    setExamResumeRecord(null);
     setCurrentPaperId(null);
     setActiveTab(getReturnTab(resultReturnPage));
     setPage(resultReturnPage);
@@ -436,6 +521,7 @@ export default function App() {
     setCurrentPaperId(null);
     setPracticeQuestions(null);
     setPracticeConfig(null);
+    setExamResumeRecord(null);
     setActiveTab(getReturnTab(resultReturnPage));
     setPage(resultReturnPage);
   };
@@ -458,12 +544,20 @@ export default function App() {
     setUserMenuOpen(false);
   };
 
+  const handleOpenPaperSearch = () => {
+    const keyword = window.prompt("输入试卷关键词（标题/地区/年份）", paperSearchKeyword);
+    if (keyword !== null) setPaperSearchKeyword(String(keyword).trim());
+    setActiveTab("模拟考试");
+    setPage("papers");
+    setPaperSearchFocusToken((token) => token + 1);
+  };
+
   // 考试模式全屏
   if (page === "exam" && currentPaperId) {
     return (
       <div className={`app theme-${theme}`}>
         <div className={appStageClassName}>
-          <ExamRoom paperId={currentPaperId} onFinish={handleFinishExam} onExit={handleExitExam} />
+          <ExamRoom paperId={currentPaperId} resumeRecord={examResumeRecord} onFinish={handleFinishExam} onExit={handleExitExam} />
         </div>
         {onboarding}
       </div>
@@ -478,10 +572,12 @@ export default function App() {
           <ExamRoom
             questions={practiceQuestions}
             config={practiceConfig}
+            resumeRecord={examResumeRecord}
             onFinish={handleFinishExam}
             onExit={() => {
               setPracticeQuestions(null);
               setPracticeConfig(null);
+              setExamResumeRecord(null);
               setActiveTab(getReturnTab(resultReturnPage));
               setPage(resultReturnPage);
             }}
@@ -581,7 +677,7 @@ export default function App() {
               </nav>
             </div>
             <div className="header-actions">
-              <button className="search">
+              <button className="search" type="button" onClick={handleOpenPaperSearch} title="搜索试卷">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
                 </svg>
@@ -644,7 +740,11 @@ export default function App() {
 
           <div className="workspace-body">
             {page === "papers" ? (
-              <PaperList onOpenPaper={(paper) => handleOpenPaper(paper, 'papers')} />
+              <PaperList
+                onOpenPaper={(paper) => handleOpenPaper(paper, 'papers')}
+                initialKeyword={paperSearchKeyword}
+                focusToken={paperSearchFocusToken}
+              />
             ) : page === "practice" ? (
               <PracticeModule onImport={() => setPage("import")} onStartPractice={handleStartPractice} onHistory={() => setPage("history")} />
             ) : page === "history" ? (
@@ -665,7 +765,7 @@ export default function App() {
             ) : page === "ai-teacher" ? (
               <AITeacher />
             ) : page === "wrong-book" ? (
-              <WrongBook />
+              <WrongBook onRedo={handleStartWrongRedo} />
             ) : page === "analytics" ? (
               <Analytics onOpenSettings={() => setPage("settings")} />
             ) : page === "growth" ? (

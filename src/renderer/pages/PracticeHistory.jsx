@@ -20,7 +20,8 @@ export default function PracticeHistory({ onBack }) {
         return;
       }
       try {
-        const data = await window.openexam.db.getPracticeRecords();
+        const allRecords = await window.openexam.db.getPracticeRecords();
+        const data = (allRecords || []).filter((record) => String(record?.status || '').toLowerCase() === 'completed');
         setRecords(data || []);
 
         // 计算统计

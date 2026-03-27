@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld("openexam", {
     getTodayStats: () => ipcRenderer.invoke("db:getTodayStats"),
     getHeatmapData: (days) => ipcRenderer.invoke("db:getHeatmapData", days),
     getGrowthData: () => ipcRenderer.invoke("db:getGrowthData"),
+    getAppSetting: (key) => ipcRenderer.invoke("db:getAppSetting", key),
+    setAppSetting: (key, value) => ipcRenderer.invoke("db:setAppSetting", { key, value }),
     getAISettings: () => ipcRenderer.invoke("db:getAISettings"),
     saveAISettings: (settings) => ipcRenderer.invoke("db:saveAISettings", settings),
     getAIConnectionState: () => ipcRenderer.invoke("db:getAIConnectionState"),

@@ -186,6 +186,14 @@ ipcMain.handle("db:getGrowthData", () => {
   return database.getGrowthData();
 });
 
+ipcMain.handle("db:getAppSetting", (event, key) => {
+  return database.getAppPreference(key);
+});
+
+ipcMain.handle("db:setAppSetting", (event, { key, value } = {}) => {
+  return database.setAppPreference(key, value);
+});
+
 ipcMain.handle("db:getAISettings", () => {
   return database.getAISettings();
 });

@@ -1201,6 +1201,37 @@ function setAppSetting(key, value) {
   return getAppSetting(key);
 }
 
+function normalizeAppSettingKey(input) {
+  return String(input || '').trim().slice(0, 64);
+}
+
+function getAppPreference(key) {
+  const normalizedKey = normalizeAppSettingKey(key);
+  if (!normalizedKey) return null;
+  const row = getAppSetting(normalizedKey);
+  if (!row) return null;
+  return {
+    key: normalizedKey,
+    value: String(row.value ?? ''),
+    updatedAt: row.updated_at || null,
+  };
+}
+
+function setAppPreference(key, value) {
+  const normalizedKey = normalizeAppSettingKey(key);
+  if (!normalizedKey) {
+    return { success: false, error: 'INVALID_KEY' };
+  }
+  const normalizedValue = value == null ? '' : String(value);
+  const row = setAppSetting(normalizedKey, normalizedValue);
+  return {
+    success: true,
+    key: normalizedKey,
+    value: normalizedValue,
+    updatedAt: row?.updated_at || new Date().toISOString(),
+  };
+}
+
 function getAISettings() {
   const row = getAppSetting('ai_settings');
   if (!row?.value) return null;
@@ -1727,6 +1758,8 @@ module.exports = {
   getHeatmapData,
   getAchievements,
   getGrowthData,
+  getAppPreference,
+  setAppPreference,
   getAISettings,
   saveAISettings,
   getAIConnectionState,

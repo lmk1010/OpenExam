@@ -19,6 +19,7 @@ import appLogo from "./assets/openexam-logo.png";
 import { useDialog } from "./components/DialogProvider.jsx";
 
 const EXAM_TRACK_STORAGE_KEY = "openexam_exam_track_v1";
+const EXAM_TRACK_SETTING_KEY = "exam_track";
 const EXAM_TRACK_OPTIONS = [
   { key: "gongkao", label: "考公" },
   { key: "shiye", label: "事业单位" },
@@ -201,6 +202,7 @@ export default function App() {
   const [appRevealActive, setAppRevealActive] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profile, setProfile] = useState({ name: "考生用户" });
+  const [examTrackLoaded, setExamTrackLoaded] = useState(false);
   const userMenuRef = useRef(null);
   const onboardingCloseTimerRef = useRef(null);
   const appRevealTimerRef = useRef(null);
@@ -217,12 +219,58 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(EXAM_TRACK_STORAGE_KEY, examTrack);
-    } catch (error) {
-      // ignore storage failures
-    }
-  }, [examTrack]);
+    let mounted = true;
+    const loadExamTrack = async () => {
+      try {
+        if (window.openexam?.db?.getAppSetting) {
+          const record = await window.openexam.db.getAppSetting(EXAM_TRACK_SETTING_KEY);
+          if (mounted && record?.value) {
+            setExamTrack(normalizeExamTrack(record.value));
+            setExamTrackLoaded(true);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("读取类目配置失败:", error);
+      }
+
+      try {
+        const legacyTrack = normalizeExamTrack(localStorage.getItem(EXAM_TRACK_STORAGE_KEY));
+        if (mounted) setExamTrack(legacyTrack);
+        if (window.openexam?.db?.setAppSetting) {
+          await window.openexam.db.setAppSetting(EXAM_TRACK_SETTING_KEY, legacyTrack);
+        }
+      } catch (error) {
+        console.error("迁移类目配置失败:", error);
+      } finally {
+        if (mounted) setExamTrackLoaded(true);
+      }
+    };
+    loadExamTrack();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!examTrackLoaded) return;
+    const persistExamTrack = async () => {
+      try {
+        if (window.openexam?.db?.setAppSetting) {
+          await window.openexam.db.setAppSetting(EXAM_TRACK_SETTING_KEY, examTrack);
+          return;
+        }
+      } catch (error) {
+        console.error("保存类目配置失败:", error);
+      }
+      try {
+        localStorage.setItem(EXAM_TRACK_STORAGE_KEY, examTrack);
+      } catch (error) {
+        // ignore storage failures
+      }
+    };
+    persistExamTrack();
+  }, [examTrack, examTrackLoaded]);
 
   useEffect(() => {
     const syncAISettingsFromSQLite = async () => {

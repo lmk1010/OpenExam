@@ -107,7 +107,7 @@ function getGeneratedTitle(config = {}) {
   return `${trackLabel} · ${focusLabel} · ${modeLabel} · ${difficultyLabel}`;
 }
 
-export default function AIGenerate({ onOpenPaper }) {
+export default function AIGenerate({ onOpenPaper, globalTrack = "" }) {
   const [config, setConfig] = useState({
     track: "gongkao",
     customTrackName: "",
@@ -183,6 +183,11 @@ export default function AIGenerate({ onOpenPaper }) {
       setSaveTitle(generated.title);
     }
   }, [generated?.title]);
+
+  useEffect(() => {
+    if (!globalTrack) return;
+    setConfig((prev) => (prev.track === globalTrack ? prev : { ...prev, track: globalTrack }));
+  }, [globalTrack]);
 
   const handleGenerate = async () => {
     const token = generationTokenRef.current + 1;
@@ -506,7 +511,12 @@ export default function AIGenerate({ onOpenPaper }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
               <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--text)", marginBottom: 8 }}>考试类目</label>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {globalTrack ? (
+                <div style={{ fontSize: 11, color: "var(--accent)", background: "var(--accent-soft-bg)", border: "1px solid var(--accent-border-soft)", borderRadius: 8, padding: "7px 9px" }}>
+                  当前使用全局类目：{getTrackLabel(config.track, config.customTrackName)}
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {EXAM_TRACKS.map((item) => (
                   <button
                     key={item.key}
@@ -524,7 +534,8 @@ export default function AIGenerate({ onOpenPaper }) {
                     {item.name}
                   </button>
                 ))}
-              </div>
+                </div>
+              )}
               {config.track === "self" && (
                 <input
                   value={config.customTrackName}

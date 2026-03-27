@@ -18,6 +18,23 @@ import { normalizeAISettings } from "./store/aiSettings.js";
 import appLogo from "./assets/openexam-logo.png";
 import { useDialog } from "./components/DialogProvider.jsx";
 
+const EXAM_TRACK_STORAGE_KEY = "openexam_exam_track_v1";
+const EXAM_TRACK_OPTIONS = [
+  { key: "gongkao", label: "考公" },
+  { key: "shiye", label: "事业单位" },
+  { key: "kaoyan", label: "考研" },
+  { key: "self", label: "自定义" },
+];
+
+function normalizeExamTrack(input) {
+  const track = String(input || "").trim();
+  return EXAM_TRACK_OPTIONS.some((item) => item.key === track) ? track : "gongkao";
+}
+
+function getExamTrackLabel(track) {
+  return EXAM_TRACK_OPTIONS.find((item) => item.key === track)?.label || "考公";
+}
+
 const DynamicChart = ({ data, onHover }) => {
   const containerRef = React.useRef(null);
   const [dims, setDims] = React.useState({ w: 600, h: 130 });
@@ -162,6 +179,13 @@ export default function App() {
   const ONBOARDING_STORAGE_KEY = "openexam_onboarding_done_v1";
   const [theme, setTheme] = useState("light");
   const [page, setPage] = useState("home");
+  const [examTrack, setExamTrack] = useState(() => {
+    try {
+      return normalizeExamTrack(localStorage.getItem(EXAM_TRACK_STORAGE_KEY));
+    } catch (error) {
+      return "gongkao";
+    }
+  });
   const [currentPaperId, setCurrentPaperId] = useState(null);
   const [examResult, setExamResult] = useState(null);
   const [resultReturnPage, setResultReturnPage] = useState("papers");
@@ -191,6 +215,14 @@ export default function App() {
       window.openexam.setTheme(theme);
     }
   }, [theme]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(EXAM_TRACK_STORAGE_KEY, examTrack);
+    } catch (error) {
+      // ignore storage failures
+    }
+  }, [examTrack]);
 
   useEffect(() => {
     const syncAISettingsFromSQLite = async () => {
@@ -552,6 +584,11 @@ export default function App() {
     setPaperSearchFocusToken((token) => token + 1);
   };
 
+  const handleGoToAIGenerate = () => {
+    setActiveTab("AI出卷");
+    setPage("ai-generate");
+  };
+
   // 考试模式全屏
   if (page === "exam" && currentPaperId) {
     return (
@@ -677,6 +714,37 @@ export default function App() {
               </nav>
             </div>
             <div className="header-actions">
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "0 8px 0 10px",
+                  height: 34,
+                  borderRadius: 9,
+                  border: "1px solid var(--line)",
+                  background: "var(--surface)",
+                }}
+              >
+                <span style={{ fontSize: 11, color: "var(--muted)" }}>类目</span>
+                <select
+                  value={examTrack}
+                  onChange={(event) => setExamTrack(normalizeExamTrack(event.target.value))}
+                  style={{
+                    border: "none",
+                    outline: "none",
+                    background: "transparent",
+                    color: "var(--text)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {EXAM_TRACK_OPTIONS.map((item) => (
+                    <option key={item.key} value={item.key}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
               <button className="search" type="button" onClick={handleOpenPaperSearch} title="搜索试卷">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
@@ -744,9 +812,17 @@ export default function App() {
                 onOpenPaper={(paper) => handleOpenPaper(paper, 'papers')}
                 initialKeyword={paperSearchKeyword}
                 focusToken={paperSearchFocusToken}
+                examTrack={examTrack}
+                onGoAIGenerate={handleGoToAIGenerate}
               />
             ) : page === "practice" ? (
-              <PracticeModule onImport={() => setPage("import")} onStartPractice={handleStartPractice} onHistory={() => setPage("history")} />
+              <PracticeModule
+                examTrack={examTrack}
+                onImport={() => setPage("import")}
+                onStartPractice={handleStartPractice}
+                onHistory={() => setPage("history")}
+                onGoAIGenerate={handleGoToAIGenerate}
+              />
             ) : page === "history" ? (
               <PracticeHistory onBack={() => setPage("practice")} />
             ) : page === "import" ? (
@@ -761,7 +837,7 @@ export default function App() {
             ) : page === "settings" ? (
               <Settings onBack={() => setPage("home")} />
             ) : page === "ai-generate" ? (
-              <AIGenerate onOpenPaper={(paper) => handleOpenPaper(paper, 'ai-generate')} />
+              <AIGenerate globalTrack={examTrack} onOpenPaper={(paper) => handleOpenPaper(paper, 'ai-generate')} />
             ) : page === "ai-teacher" ? (
               <AITeacher />
             ) : page === "wrong-book" ? (
@@ -773,7 +849,7 @@ export default function App() {
             ) : page === "achievements" ? (
               <AchievementCenter onBack={() => { setActiveTab("我的成长"); setPage("growth"); }} />
             ) : (
-              <OriginalHomePage />
+              <OriginalHomePage examTrack={examTrack} onGoAIGenerate={handleGoToAIGenerate} />
             )}
           </div>
         </section>
@@ -785,7 +861,7 @@ export default function App() {
 }
 
 // 学习中心主页
-function OriginalHomePage() {
+function OriginalHomePage({ examTrack = "gongkao", onGoAIGenerate }) {
   const [stats, setStats] = useState({ totalQuestions: 0, totalDone: 0, accuracy: 0, wrongCount: 0, correctCount: 0, todayAdded: 0 });
   const [categories, setCategories] = useState([]);
   const [dailyStats, setDailyStats] = useState([]);
@@ -829,21 +905,26 @@ function OriginalHomePage() {
   };
 
   const totalQuestions = categories.reduce((sum, c) => sum + c.total, 0);
+  const trackLabel = getExamTrackLabel(examTrack);
+  const isDefaultTrack = examTrack === "gongkao";
 
   return (
     <>
       <section className="main-panel" style={{ padding: "0 24px 24px 20px", display: "flex", flexDirection: "column", gap: 32, overflow: "auto", minWidth: 0 }}>
         {/* Header */}
         <header style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-          <div className="breadcrumb" style={{ margin: 0, fontSize: 11, color: "var(--muted)" }}>学习中心 &gt; 行测专项</div>
+          <div className="breadcrumb" style={{ margin: 0, fontSize: 11, color: "var(--muted)" }}>学习中心 &gt; {trackLabel}</div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--line)", paddingBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ width: 28, height: 28, borderRadius: 8, background: "var(--accent-soft-bg)", display: "grid", placeItems: "center", color: "var(--accent)" }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
               </div>
-              <h2 style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.3px", margin: 0 }}>公考刷题</h2>
+              <h2 style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.3px", margin: 0 }}>{trackLabel}刷题</h2>
             </div>
-            <button style={{ 
+            <button
+              onClick={() => onGoAIGenerate?.()}
+              title="去 AI 出卷"
+              style={{
               width: 32, height: 32, borderRadius: 10, border: "1px dashed var(--accent)", 
               background: "transparent", color: "var(--accent)", cursor: "pointer", 
               display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" 
@@ -851,6 +932,11 @@ function OriginalHomePage() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
           </div>
+          {!isDefaultTrack && (
+            <div style={{ fontSize: 12, color: "var(--warning)", background: "var(--warning-soft)", border: "1px solid var(--warning-border)", borderRadius: 10, padding: "8px 10px" }}>
+              当前已切换到「{trackLabel}」。内置题库正在补齐，可先使用 AI 出卷按类目生成练习。
+            </div>
+          )}
         </header>
 
         {/* Chart Area - 动态真实数据 */}

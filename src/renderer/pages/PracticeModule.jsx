@@ -18,6 +18,13 @@ const defaultSubCategories = {
   changshi: ['zhengzhi', 'jingji', 'falv', 'keji', 'renwen', 'dili'],
 };
 
+const TRACK_LABELS = {
+  gongkao: '考公',
+  shiye: '事业单位',
+  kaoyan: '考研',
+  self: '自定义',
+};
+
 // 子分类中文映射
 const subCategoryNames = {
   // 言语理解
@@ -91,7 +98,7 @@ const Icons = {
 // 检查是否在 Electron 环境
 const isElectron = () => window.openexam?.db;
 
-export default function PracticeModule({ onStartPractice, onImport, onHistory }) {
+export default function PracticeModule({ onStartPractice, onImport, onHistory, examTrack = 'gongkao', onGoAIGenerate }) {
   const [expandedId, setExpandedId] = useState(null);
   const [modules, setModules] = useState([]);
   const [stats, setStats] = useState({ totalQuestions: 0, totalDone: 0, accuracy: 0, wrongCount: 0 });
@@ -109,6 +116,11 @@ export default function PracticeModule({ onStartPractice, onImport, onHistory })
   // 加载数据
   useEffect(() => {
     const loadData = async () => {
+      if (examTrack !== 'gongkao') {
+        setModules([]);
+        setLoading(false);
+        return;
+      }
       if (!isElectron()) {
         // 非 Electron 环境，显示所有默认分类
         const defaultModules = Object.entries(categoryConfig).map(([id, cfg]) => ({
@@ -149,7 +161,7 @@ export default function PracticeModule({ onStartPractice, onImport, onHistory })
     };
 
     loadData();
-  }, []);
+  }, [examTrack]);
 
   // 加载子分类
   const loadSubCategories = async (category) => {
@@ -213,6 +225,20 @@ export default function PracticeModule({ onStartPractice, onImport, onHistory })
 
   if (loading) {
     return <div className="practice-page"><div className="loading-state">加载中...</div></div>;
+  }
+
+  if (examTrack !== 'gongkao') {
+    return (
+      <div className="practice-page">
+        <div className="empty-state" style={{ gap: 10 }}>
+          <p>当前类目（{TRACK_LABELS[examTrack] || examTrack}）暂无内置专项题库</p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button className="summary-btn outline" onClick={() => onImport?.()}>导入试卷</button>
+            <button className="summary-btn" onClick={() => onGoAIGenerate?.()}>去 AI 出卷</button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const totalCount = modules.reduce((sum, m) => sum + m.count, 0);

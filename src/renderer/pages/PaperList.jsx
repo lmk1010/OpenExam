@@ -65,6 +65,25 @@ function normalizePaperProvince(value) {
 }
 
 const PAGE_SIZE = 12;
+const TRACK_SUBJECTS = {
+  gongkao: 'xingce',
+  shiye: 'shiye',
+  kaoyan: 'kaoyan',
+  self: 'custom',
+};
+const TRACK_LABELS = {
+  gongkao: '考公',
+  shiye: '事业单位',
+  kaoyan: '考研',
+  self: '自定义',
+};
+
+function matchTrack(paper, track = 'gongkao') {
+  const expected = TRACK_SUBJECTS[track] || TRACK_SUBJECTS.gongkao;
+  const subject = String(paper?.subject || '').trim();
+  if (track === 'gongkao') return !subject || subject === expected;
+  return subject === expected;
+}
 
 function getPaperBadge(paper) {
   switch (paper?.type) {
@@ -98,7 +117,7 @@ function hasAnyAnswer(record) {
   });
 }
 
-export default function PaperList({ onOpenPaper, initialKeyword = '', focusToken = 0 }) {
+export default function PaperList({ onOpenPaper, initialKeyword = '', focusToken = 0, examTrack = 'gongkao', onGoAIGenerate }) {
   const [papers, setPapers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedProvince, setSelectedProvince] = useState('all');
@@ -142,13 +161,17 @@ export default function PaperList({ onOpenPaper, initialKeyword = '', focusToken
     keywordInputRef.current?.focus();
   }, [focusToken]);
 
+  const trackPapers = useMemo(
+    () => papers.filter((paper) => matchTrack(paper, examTrack)),
+    [papers, examTrack]
+  );
   // 获取可用筛选项
-  const years = useMemo(() => [...new Set(papers.map(p => p.year))].sort((a, b) => b - a), [papers]);
-  const subjects = useMemo(() => [...new Set(papers.map(p => String(p.subject || '').trim()).filter(Boolean))], [papers]);
+  const years = useMemo(() => [...new Set(trackPapers.map(p => p.year))].sort((a, b) => b - a), [trackPapers]);
+  const subjects = useMemo(() => [...new Set(trackPapers.map(p => String(p.subject || '').trim()).filter(Boolean))], [trackPapers]);
   const normalizedKeyword = String(keyword || '').trim().toLowerCase();
 
   // 筛选试卷
-  const filteredPapers = papers.filter(p => {
+  const filteredPapers = trackPapers.filter(p => {
     // 省份筛选
     if (selectedProvince !== 'all') {
       if (selectedProvince === 'national') {
@@ -186,6 +209,13 @@ export default function PaperList({ onOpenPaper, initialKeyword = '', focusToken
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedProvince, selectedYear, selectedSubject, normalizedKeyword]);
+
+  useEffect(() => {
+    setSelectedProvince('all');
+    setSelectedYear('all');
+    setSelectedSubject('all');
+    setCurrentPage(1);
+  }, [examTrack]);
 
   const handleStart = async (paper) => {
     onOpenPaper?.({
@@ -236,19 +266,21 @@ export default function PaperList({ onOpenPaper, initialKeyword = '', focusToken
   return (
     <div className="paper-list-page">
       {/* 省份标签筛选 */}
-      <div className="province-filter">
-        <div className="province-tags">
-          {PROVINCES.map(p => (
-            <button
-              key={p.key}
-              className={`province-tag ${selectedProvince === p.key ? 'active' : ''}`}
-              onClick={() => setSelectedProvince(p.key)}
-            >
-              {p.label}
-            </button>
-          ))}
+      {examTrack === 'gongkao' && (
+        <div className="province-filter">
+          <div className="province-tags">
+            {PROVINCES.map(p => (
+              <button
+                key={p.key}
+                className={`province-tag ${selectedProvince === p.key ? 'active' : ''}`}
+                onClick={() => setSelectedProvince(p.key)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 年份筛选和统计 */}
       <div className="filter-bar">
@@ -295,6 +327,7 @@ export default function PaperList({ onOpenPaper, initialKeyword = '', focusToken
           />
         </div>
         <div className="filter-right">
+          <span className="result-count" style={{ marginRight: 8 }}>类目：{TRACK_LABELS[examTrack] || examTrack}</span>
           <span className="result-count">共 {filteredPapers.length} 套试卷</span>
         </div>
       </div>
@@ -349,7 +382,31 @@ export default function PaperList({ onOpenPaper, initialKeyword = '', focusToken
       {/* 空状态 */}
       {filteredPapers.length === 0 && (
         <div className="empty-state">
-          <p>暂无符合条件的试卷</p>
+          {trackPapers.length === 0 ? (
+            <>
+              <p>当前类目（{TRACK_LABELS[examTrack] || examTrack}）暂无内置试卷</p>
+              <button
+                type="button"
+                onClick={() => onGoAIGenerate?.()}
+                style={{
+                  marginTop: 8,
+                  height: 32,
+                  borderRadius: 8,
+                  border: '1px solid var(--accent)',
+                  background: 'var(--accent-soft-bg)',
+                  color: 'var(--accent)',
+                  padding: '0 12px',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                去 AI 出卷
+              </button>
+            </>
+          ) : (
+            <p>暂无符合条件的试卷</p>
+          )}
         </div>
       )}
 

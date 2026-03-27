@@ -389,8 +389,12 @@ ipcMain.handle("ai:generatePaper", async (event, { settings, config }) => {
     provider: settings?.aiProvider || "",
     model: settings?.model || settings?.customModel || "",
     apiFormat: settings?.apiFormat || "",
+    track: config?.track,
+    focus: config?.focus,
+    mode: config?.mode,
     count: config?.count,
     category: config?.category,
+    mixedCategories: Array.isArray(config?.mixedCategories) ? config.mixedCategories.join(",") : "",
     difficulty: config?.difficulty,
   });
 

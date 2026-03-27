@@ -8,6 +8,30 @@ const CATEGORIES = [
   { key: "panduan", name: "判断推理" }, { key: "ziliao", name: "资料分析" },
   { key: "changshi", name: "常识判断" },
 ];
+const DEFAULT_MIXED_CATEGORIES = CATEGORIES.map((item) => item.key);
+const EXAM_TRACKS = [
+  { key: "gongkao", name: "考公" },
+  { key: "shiye", name: "事业单位" },
+  { key: "kaoyan", name: "考研" },
+  { key: "self", name: "自定义备考" },
+];
+const TRACK_SUBJECTS = {
+  gongkao: "xingce",
+  shiye: "shiye",
+  kaoyan: "kaoyan",
+  self: "custom",
+};
+const FOCUS_PRESETS = [
+  { key: "standard", name: "通用组卷" },
+  { key: "idiom", name: "成语练习" },
+  { key: "current_affairs", name: "时政热点" },
+  { key: "computer", name: "计算机基础" },
+  { key: "custom", name: "自定义方向" },
+];
+const ANALYSIS_MODES = [
+  { key: "brief", name: "简明解析" },
+  { key: "thinking", name: "解题思路" },
+];
 const DIFFICULTIES = [
   { value: 1, label: "入门" }, { value: 2, label: "简单" }, { value: 3, label: "中等" },
   { value: 4, label: "较难" }, { value: 5, label: "困难" },
@@ -55,8 +79,51 @@ function getSavedPaperMeta(type) {
   };
 }
 
+function getTrackLabel(track, customTrackName = "") {
+  if (track === "self") return String(customTrackName || "自定义备考").trim() || "自定义备考";
+  return EXAM_TRACKS.find((item) => item.key === track)?.name || track || "未分类";
+}
+
+function getFocusLabel(focus, customFocusName = "") {
+  if (focus === "custom") return String(customFocusName || "自定义方向").trim() || "自定义方向";
+  return FOCUS_PRESETS.find((item) => item.key === focus)?.name || focus || "通用组卷";
+}
+
+function getPaperSubject(config = {}) {
+  if (config.track === "self") {
+    const customSubject = String(config.customTrackName || "").trim();
+    return customSubject || TRACK_SUBJECTS.self;
+  }
+  return TRACK_SUBJECTS[config.track] || "xingce";
+}
+
+function getGeneratedTitle(config = {}) {
+  const trackLabel = getTrackLabel(config.track, config.customTrackName);
+  const focusLabel = getFocusLabel(config.focus, config.customFocusName);
+  const modeLabel = config.mode === "mixed"
+    ? "综合组卷"
+    : (CATEGORIES.find((item) => item.key === config.category)?.name || "专项");
+  const difficultyLabel = DIFFICULTIES.find((item) => item.value === config.difficulty)?.label || "中等";
+  return `${trackLabel} · ${focusLabel} · ${modeLabel} · ${difficultyLabel}`;
+}
+
 export default function AIGenerate({ onOpenPaper }) {
-  const [config, setConfig] = useState({ category: "yanyu", difficulty: 3, count: 10, customPrompt: "" });
+  const [config, setConfig] = useState({
+    track: "gongkao",
+    customTrackName: "",
+    focus: "standard",
+    customFocusName: "",
+    mode: "single",
+    category: "yanyu",
+    mixedCategories: [...DEFAULT_MIXED_CATEGORIES],
+    analysisMode: "brief",
+    includeCurrentAffairs: false,
+    currentAffairsDays: 30,
+    currentAffairsKeywords: "",
+    difficulty: 3,
+    count: 10,
+    customPrompt: "",
+  });
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(null);
   const [error, setError] = useState(null);
@@ -122,6 +189,13 @@ export default function AIGenerate({ onOpenPaper }) {
     generationTokenRef.current = token;
     longWaitWarnedRef.current = false;
     setError(null);
+    if (config.mode === "mixed" && (!Array.isArray(config.mixedCategories) || !config.mixedCategories.length)) {
+      const msg = "综合组卷至少选择 1 个题目分类。";
+      setError(msg);
+      pushFeedback("warning", msg);
+      showToast({ title: "参数不完整", message: msg, tone: "warning" });
+      return;
+    }
     if (!isAIConfigured() || !window.openexam?.ai) {
       const msg = "请先在「设置」中配置 AI 服务。";
       setError(msg);
@@ -161,7 +235,10 @@ export default function AIGenerate({ onOpenPaper }) {
 
     try {
       const settings = getAISettings();
-      pushFeedback("info", `参数已提交：${config.count} 题 / ${CATEGORIES.find(c => c.key === config.category)?.name || config.category}`);
+      const categoryText = config.mode === "mixed"
+        ? config.mixedCategories.map((key) => CATEGORIES.find((c) => c.key === key)?.name || key).join("、")
+        : (CATEGORIES.find((c) => c.key === config.category)?.name || config.category);
+      pushFeedback("info", `参数已提交：${getTrackLabel(config.track, config.customTrackName)} / ${config.count}题 / ${categoryText}`);
       const result = await window.openexam.ai.generatePaper(settings, config);
       if (generationTokenRef.current !== token) return;
       if (result.success && result.questions?.length) {
@@ -171,7 +248,12 @@ export default function AIGenerate({ onOpenPaper }) {
         setElapsedMs(Date.now() - startedAtRef.current);
         pushFeedback("success", `生成成功，共 ${result.questions.length} 道题。${result.debugId ? ` [${result.debugId}]` : ""}`);
         showToast({ title: "生成成功", message: `共生成 ${result.questions.length} 道题目。`, tone: "success" });
-        setGenerated({ questions: result.questions, title: `${CATEGORIES.find(c => c.key === config.category)?.name} · ${DIFFICULTIES.find(d => d.value === config.difficulty)?.label}`, count: result.questions.length, time: new Date().toLocaleString() });
+        setGenerated({
+          questions: result.questions,
+          title: getGeneratedTitle(config),
+          count: result.questions.length,
+          time: new Date().toLocaleString(),
+        });
       } else {
         const msg = normalizeErrorMessage(result.error || "AI 未返回有效题目。");
         const wrapped = `${msg}${result?.debugId ? ` [${result.debugId}]` : ""}`;
@@ -201,7 +283,7 @@ export default function AIGenerate({ onOpenPaper }) {
       year: new Date().getFullYear(),
       duration: Math.max(20, (generated?.count || 0) * 2),
       type: "ai_exam",
-      subject: "xingce",
+      subject: getPaperSubject(config),
       question_count: generated?.count || 0,
       difficulty: config.difficulty,
     },
@@ -221,6 +303,9 @@ export default function AIGenerate({ onOpenPaper }) {
       const r = await window.openexam.db.saveAIPaper({
         title,
         year: new Date().getFullYear(),
+        subject: getPaperSubject(config),
+        category: config.mode === "mixed" ? "mixed" : config.category,
+        subCategory: config.focus,
         difficulty: config.difficulty,
         duration: Math.max(targetType === "ai_practice" ? 15 : 20, (generated?.count || 0) * 2),
         type: targetType,
@@ -383,6 +468,15 @@ export default function AIGenerate({ onOpenPaper }) {
     }
   };
 
+  const toggleMixedCategory = (categoryKey) => {
+    setConfig((prev) => {
+      const current = Array.isArray(prev.mixedCategories) ? prev.mixedCategories : [];
+      const exists = current.includes(categoryKey);
+      const next = exists ? current.filter((item) => item !== categoryKey) : [...current, categoryKey];
+      return { ...prev, mixedCategories: next };
+    });
+  };
+
   const elapsedSec = Math.max(0, Math.floor(elapsedMs / 1000));
   const elapsedText = `${Math.floor(elapsedSec / 60)}分${String(elapsedSec % 60).padStart(2, "0")}秒`;
 
@@ -410,70 +504,251 @@ export default function AIGenerate({ onOpenPaper }) {
           <h3 style={{ fontSize: 13, fontWeight: 600 }}>出卷配置</h3>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {/* Category */}
             <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--text)", marginBottom: 8 }}>题目分类</label>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--text)", marginBottom: 8 }}>考试类目</label>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {CATEGORIES.map(c => (
-                  <button key={c.key} onClick={() => setConfig({ ...config, category: c.key })}
-                    style={{ 
-                      fontSize: 11, padding: "4px 12px", borderRadius: 16, cursor: "pointer", transition: "all 0.2s",
-                      ...(config.category === c.key ? 
-                        { background: "var(--accent)", color: "#fff", border: "1px solid var(--accent)", boxShadow: "0 8px 18px rgba(15,23,42,0.08)" } : 
-                        { background: "transparent", color: "var(--muted)", border: "1px solid var(--line)" }) 
-                    }}>
-                    {c.name}
+                {EXAM_TRACKS.map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => setConfig((prev) => ({ ...prev, track: item.key }))}
+                    style={{
+                      fontSize: 11,
+                      padding: "4px 10px",
+                      borderRadius: 14,
+                      cursor: "pointer",
+                      border: config.track === item.key ? "1px solid var(--accent)" : "1px solid var(--line)",
+                      background: config.track === item.key ? "var(--accent-soft-bg)" : "transparent",
+                      color: config.track === item.key ? "var(--accent)" : "var(--muted)",
+                    }}
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+              {config.track === "self" && (
+                <input
+                  value={config.customTrackName}
+                  onChange={(e) => setConfig((prev) => ({ ...prev, customTrackName: e.target.value }))}
+                  placeholder="输入你的考试类目，例如：校招、职称考试"
+                  style={{ width: "100%", marginTop: 8, padding: "7px 9px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--text)", fontSize: 11 }}
+                />
+              )}
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--text)", marginBottom: 8 }}>训练方向</label>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {FOCUS_PRESETS.map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => {
+                      setConfig((prev) => {
+                        const nextCategory = item.key === "idiom" ? "yanyu" : (item.key === "computer" ? "changshi" : prev.category);
+                        return { ...prev, focus: item.key, category: nextCategory };
+                      });
+                    }}
+                    style={{
+                      fontSize: 11,
+                      padding: "4px 10px",
+                      borderRadius: 14,
+                      cursor: "pointer",
+                      border: config.focus === item.key ? "1px solid var(--accent)" : "1px solid var(--line)",
+                      background: config.focus === item.key ? "var(--accent-soft-bg)" : "transparent",
+                      color: config.focus === item.key ? "var(--accent)" : "var(--muted)",
+                    }}
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+              {config.focus === "custom" && (
+                <input
+                  value={config.customFocusName}
+                  onChange={(e) => setConfig((prev) => ({ ...prev, customFocusName: e.target.value }))}
+                  placeholder="输入训练方向，例如：公文写作、算法基础"
+                  style={{ width: "100%", marginTop: 8, padding: "7px 9px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--text)", fontSize: 11 }}
+                />
+              )}
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--text)", marginBottom: 8 }}>组卷模式</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[{ key: "single", name: "专项" }, { key: "mixed", name: "综合组卷" }].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => setConfig((prev) => ({ ...prev, mode: item.key }))}
+                    style={{
+                      fontSize: 11,
+                      padding: "5px 10px",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      border: config.mode === item.key ? "1px solid var(--accent)" : "1px solid var(--line)",
+                      background: config.mode === item.key ? "var(--accent-soft-bg)" : "transparent",
+                      color: config.mode === item.key ? "var(--accent)" : "var(--muted)",
+                    }}
+                  >
+                    {item.name}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Difficulty */}
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--text)", marginBottom: 8 }}>
+                {config.mode === "mixed" ? "综合题型覆盖" : "题目分类"}
+              </label>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {CATEGORIES.map((item) => {
+                  const active = config.mode === "mixed"
+                    ? config.mixedCategories.includes(item.key)
+                    : config.category === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => {
+                        if (config.mode === "mixed") {
+                          toggleMixedCategory(item.key);
+                        } else {
+                          setConfig((prev) => ({ ...prev, category: item.key }));
+                        }
+                      }}
+                      style={{
+                        fontSize: 11,
+                        padding: "4px 10px",
+                        borderRadius: 16,
+                        cursor: "pointer",
+                        border: active ? "1px solid var(--accent)" : "1px solid var(--line)",
+                        background: active ? "var(--accent-soft-bg)" : "transparent",
+                        color: active ? "var(--accent)" : "var(--muted)",
+                      }}
+                    >
+                      {item.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--text)", marginBottom: 8 }}>解析风格</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                {ANALYSIS_MODES.map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => setConfig((prev) => ({ ...prev, analysisMode: item.key }))}
+                    style={{
+                      fontSize: 11,
+                      padding: "5px 10px",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      border: config.analysisMode === item.key ? "1px solid var(--accent)" : "1px solid var(--line)",
+                      background: config.analysisMode === item.key ? "var(--accent-soft-bg)" : "transparent",
+                      color: config.analysisMode === item.key ? "var(--accent)" : "var(--muted)",
+                    }}
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ border: "1px solid var(--line)", borderRadius: 8, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 8 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text)", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={config.includeCurrentAffairs}
+                  onChange={(e) => setConfig((prev) => ({ ...prev, includeCurrentAffairs: e.target.checked }))}
+                />
+                联动时政热点（AI 优先联网检索）
+              </label>
+              {config.includeCurrentAffairs && (
+                <div style={{ display: "grid", gridTemplateColumns: "64px 1fr", gap: 6 }}>
+                  <input
+                    type="number"
+                    min="7"
+                    max="180"
+                    value={config.currentAffairsDays}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, currentAffairsDays: Math.max(7, Math.min(180, Number(e.target.value) || 30)) }))}
+                    style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--text)", fontSize: 11 }}
+                  />
+                  <input
+                    value={config.currentAffairsKeywords}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, currentAffairsKeywords: e.target.value }))}
+                    placeholder="关键词，如：人工智能 + 两会 + 数字经济"
+                    style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--text)", fontSize: 11 }}
+                  />
+                </div>
+              )}
+            </div>
+
             <div>
               <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--text)", marginBottom: 8 }}>难度层级</label>
               <div style={{ display: "flex", gap: 4 }}>
-                {DIFFICULTIES.map(d => (
-                  <button key={d.value} onClick={() => setConfig({ ...config, difficulty: d.value })}
-                    style={{ 
-                      fontSize: 11, padding: "4px 0", flex: 1, borderRadius: 6, cursor: "pointer", transition: "all 0.2s",
-                      ...(config.difficulty === d.value ? 
-                        { background: "var(--surface-soft)", color: "var(--accent)", border: "1px solid var(--accent)", fontWeight: 600 } : 
-                        { background: "transparent", color: "var(--muted)", border: "1px solid var(--line)" }) 
-                    }}>
-                    {d.label}
+                {DIFFICULTIES.map((item) => (
+                  <button
+                    key={item.value}
+                    onClick={() => setConfig((prev) => ({ ...prev, difficulty: item.value }))}
+                    style={{
+                      fontSize: 11,
+                      padding: "4px 0",
+                      flex: 1,
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      border: config.difficulty === item.value ? "1px solid var(--accent)" : "1px solid var(--line)",
+                      background: config.difficulty === item.value ? "var(--surface-soft)" : "transparent",
+                      color: config.difficulty === item.value ? "var(--accent)" : "var(--muted)",
+                      fontWeight: config.difficulty === item.value ? 600 : 500,
+                    }}
+                  >
+                    {item.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Count */}
             <div>
               <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, fontWeight: 500, color: "var(--text)", marginBottom: 8 }}>
                 <span>生成题数</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--accent)" }}>{config.count} 题</span>
               </label>
-              <input type="range" min="5" max="50" step="5" value={config.count}
-                onChange={e => setConfig({ ...config, count: +e.target.value })}
-                style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer" }} />
+              <input
+                type="range"
+                min="5"
+                max="50"
+                step="5"
+                value={config.count}
+                onChange={(e) => setConfig((prev) => ({ ...prev, count: +e.target.value }))}
+                style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer" }}
+              />
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
                 <span>5</span>
                 <span>50</span>
               </div>
             </div>
 
-            {/* Custom Prompt */}
             <div>
               <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--text)", marginBottom: 6 }}>附加要求 (可选)</label>
-              <textarea value={config.customPrompt} onChange={e => setConfig({ ...config, customPrompt: e.target.value })}
-                placeholder="例如：侧重经济学相关常识、或强调近义词辨析..."
+              <textarea
+                value={config.customPrompt}
+                onChange={(e) => setConfig((prev) => ({ ...prev, customPrompt: e.target.value }))}
+                placeholder="例如：重点覆盖成语辨析，增加计算机网络和操作系统题。"
                 rows={3}
-                style={{ 
-                  width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line)", 
-                  background: "var(--surface)", color: "var(--text)", fontSize: 11, resize: "none", 
-                  fontFamily: "inherit", outline: "none", transition: "border-color 0.2s" 
-                }} 
-                onFocus={e => e.target.style.borderColor = "var(--accent)"}
-                onBlur={e => e.target.style.borderColor = "var(--line)"}
+                style={{
+                  width: "100%",
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: "1px solid var(--line)",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  fontSize: 11,
+                  resize: "none",
+                  fontFamily: "inherit",
+                  outline: "none",
+                  transition: "border-color 0.2s",
+                }}
+                onFocus={(e) => { e.target.style.borderColor = "var(--accent)"; }}
+                onBlur={(e) => { e.target.style.borderColor = "var(--line)"; }}
               />
             </div>
           </div>

@@ -622,22 +622,101 @@ const CATEGORY_NAMES = {
   ziliao: '资料分析', changshi: '常识判断',
 };
 
+const EXAM_TRACK_NAMES = {
+  gongkao: '考公',
+  shiye: '事业单位',
+  kaoyan: '考研',
+  self: '自定义备考',
+};
+
+const FOCUS_NAMES = {
+  standard: '通用组卷',
+  idiom: '成语练习',
+  current_affairs: '时政热点',
+  computer: '计算机基础',
+  custom: '自定义方向',
+};
+
 const DIFFICULTY_NAMES = {
   1: '入门级（非常简单）', 2: '简单', 3: '中等', 4: '较难', 5: '困难（需要深入思考）',
 };
 
+function getTargetCategories(config = {}) {
+  const mixed = Array.isArray(config?.mixedCategories) ? config.mixedCategories.filter(Boolean) : [];
+  if (config?.mode === 'mixed' && mixed.length) return mixed;
+  const single = String(config?.category || '').trim();
+  return single ? [single] : ['changshi'];
+}
+
+function getTrackLabel(config = {}) {
+  if (config?.track === 'self') {
+    return String(config?.customTrackName || '').trim() || EXAM_TRACK_NAMES.self;
+  }
+  return EXAM_TRACK_NAMES[config?.track] || EXAM_TRACK_NAMES.gongkao;
+}
+
+function getFocusLabel(config = {}) {
+  if (config?.focus === 'custom') {
+    return String(config?.customFocusName || '').trim() || FOCUS_NAMES.custom;
+  }
+  return FOCUS_NAMES[config?.focus] || FOCUS_NAMES.standard;
+}
+
+function getFocusDirective(config = {}) {
+  if (config?.focus === 'idiom') {
+    return '重点出成语辨析、近义词辨析、词语搭配与语境判断题，优先言语题型。';
+  }
+  if (config?.focus === 'current_affairs') {
+    return '重点结合近年政策热点、科技产业动态和重大会议部署，题干保持客观严谨。';
+  }
+  if (config?.focus === 'computer') {
+    return '重点覆盖计算机基础、操作系统、网络、数据库、数据结构与编程常识。';
+  }
+  if (config?.focus === 'custom') {
+    const custom = String(config?.customFocusName || '').trim();
+    return custom ? `重点方向：${custom}` : '';
+  }
+  return '';
+}
+
+function getCurrentAffairsDirective(config = {}) {
+  const enabled = Boolean(config?.includeCurrentAffairs) || config?.focus === 'current_affairs';
+  if (!enabled) return '';
+  const days = Math.max(7, Math.min(180, Number(config?.currentAffairsDays) || 30));
+  const keywords = String(config?.currentAffairsKeywords || '').trim();
+  return `请优先结合最近 ${days} 天公开时政信息命题${keywords ? `，重点关注：${keywords}` : ''}。若模型无法联网检索，请使用近两年稳定热点并在解析中加“时效提示”。`;
+}
+
 function buildGeneratePrompt(config) {
-  const catName = CATEGORY_NAMES[config.category] || config.category;
+  const targetCategories = getTargetCategories(config);
+  const catName = targetCategories.map((key) => CATEGORY_NAMES[key] || key).join('、');
   const diffName = DIFFICULTY_NAMES[config.difficulty] || '中等';
   const count = Math.max(1, Number(config?.count) || 10);
+  const trackName = getTrackLabel(config);
+  const focusName = getFocusLabel(config);
+  const modeText = config?.mode === 'mixed' ? '综合组卷' : '专项组卷';
+  const focusDirective = getFocusDirective(config);
+  const currentAffairsDirective = getCurrentAffairsDirective(config);
+  const analysisMode = config?.analysisMode === 'thinking'
+    ? 'analysis 字段使用“解题思路：...；答案依据：...”格式，控制在 120 字内'
+    : 'analysis 字段保持简要解析，控制在 60 字内';
+  const categoryLimit = config?.mode === 'mixed'
+    ? `category 必须从 [${targetCategories.join(', ')}] 中选择`
+    : `category 固定为 "${targetCategories[0]}"`;
+  const defaultCategory = targetCategories[0] || 'changshi';
 
   return `你是一位资深的考试命题专家。请根据以下要求生成高质量考试题。
 
 要求：
+- 考试类目: ${trackName}
+- 训练方向: ${focusName}
+- 组卷模式: ${modeText}
 - 科目分类: ${catName}
 - 难度等级: ${diffName}
 - 题目数量: ${count} 道
 - 题目类型: 单选题（4个选项）
+${focusDirective ? `- 方向约束: ${focusDirective}` : ''}
+${currentAffairsDirective ? `- 时政约束: ${currentAffairsDirective}` : ''}
 ${config.customPrompt ? `- 额外要求: ${config.customPrompt}` : ''}
 
 请严格按以下 JSON 格式输出，不要输出其他内容：
@@ -652,9 +731,9 @@ ${config.customPrompt ? `- 额外要求: ${config.customPrompt}` : ''}
         {"key": "D", "content": "选项D"}
       ],
       "answer": "正确答案字母",
-      "analysis": "简要解析（不超过60字）",
+      "analysis": "题目解析",
       "difficulty": ${config.difficulty},
-      "category": "${config.category}",
+      "category": "${defaultCategory}",
       "subCategory": ""
     }
   ]
@@ -664,13 +743,15 @@ ${config.customPrompt ? `- 额外要求: ${config.customPrompt}` : ''}
 1. 每道题目必须有完整题干、4个选项、正确答案和解析
 2. 题目质量要高，不能有常识性错误
 3. 难度要符合要求，不能过简单也不能过难
-4. 解析简洁清晰，单题不超过60字
-5. 只输出 JSON，不要有其他文字`;
+4. ${analysisMode}
+5. ${categoryLimit}
+6. 只输出 JSON，不要有其他文字`;
 }
 
 function getGenerateMaxOutputTokens(config) {
   const count = Math.max(1, Number(config?.count) || 10);
-  return Math.max(1200, Math.min(8000, count * 300));
+  const perQuestion = (config?.analysisMode === 'thinking' ? 360 : 300) + (config?.includeCurrentAffairs ? 50 : 0);
+  return Math.max(1200, Math.min(10000, count * perQuestion));
 }
 
 function normalizeGeneratedOptions(question) {
@@ -698,18 +779,26 @@ function normalizeGeneratedOptions(question) {
 
 function normalizeGeneratedQuestions(rawQuestions, config) {
   const list = Array.isArray(rawQuestions) ? rawQuestions : [];
+  const targetCategories = getTargetCategories(config);
   return list.map((question, index) => {
     const content = String(question?.content || '').trim();
     const options = normalizeGeneratedOptions(question);
     const answer = String(question?.answer || '').trim().toUpperCase();
     if (!content || options.length < 2) return null;
+    const fallbackCategory = targetCategories[index % Math.max(targetCategories.length, 1)] || 'changshi';
+    let category = String(question?.category || '').trim();
+    if (!category) {
+      category = fallbackCategory;
+    } else if (config?.mode === 'mixed' && targetCategories.length && !targetCategories.includes(category)) {
+      category = fallbackCategory;
+    }
     return {
       content,
       options,
       answer,
       analysis: String(question?.analysis || '').trim(),
       difficulty: Math.max(1, Math.min(5, Number(question?.difficulty) || Number(config?.difficulty) || 3)),
-      category: String(question?.category || config?.category || '').trim(),
+      category,
       subCategory: String(question?.subCategory || question?.sub_category || '').trim(),
     };
   }).filter(Boolean);
@@ -811,7 +900,11 @@ async function generatePaper(settings, config) {
     model,
     apiFormat: normalizedSettings.apiFormat || '',
     apiBase: toSafeApiHost(normalizedSettings.apiBase),
+    track: config?.track,
+    focus: config?.focus,
+    mode: config?.mode,
     category: config?.category,
+    mixedCategories: Array.isArray(config?.mixedCategories) ? config.mixedCategories.join(',') : '',
     difficulty: config?.difficulty,
     count: config?.count,
     maxOutputTokens,

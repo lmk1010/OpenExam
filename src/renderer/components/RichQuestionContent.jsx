@@ -35,7 +35,7 @@ function normalizeUrl(value) {
   const url = String(value || '').trim();
   if (!url) return '';
   if (url.startsWith('//')) return `https:${url}`;
-  if (url.startsWith('/')) return `https://saduck.top${url}`;
+  if (url.startsWith('/')) return '';
   return url;
 }
 

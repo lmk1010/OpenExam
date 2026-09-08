@@ -994,8 +994,179 @@ async function testConnection(settings) {
   }
 }
 
+/* ==================================================================
+   申论批改
+   ================================================================== */
+
+const ESSAY_GRADER_SYSTEM = `你是一位阅卷经验丰富的公考申论阅卷老师。你的任务是按评分标准客观批改考生答案，不是鼓励，也不是教学。
+批改必须做到：
+1. 逐条对照采分点，明确指出考生写到了哪些、漏了哪些
+2. 漏点要说清楚"材料里在哪、为什么该写、为什么考生会漏"
+3. 打分严格按要点覆盖为主，语言表述为辅，不放水
+4. 只输出 JSON，不要任何解释性文字、不要代码块标记`;
+
+const ESSAY_TYPE_LABEL = {
+  guina: '归纳概括',
+  duice: '提出对策',
+  fenxi: '综合分析',
+  guanche: '贯彻执行',
+  dazuowen: '大作文',
+};
+
+function buildEssayGradePrompt(payload = {}) {
+  const {
+    essayType = 'guina',
+    material = '',
+    requirement = '',
+    wordLimit,
+    referenceAnswer = '',
+    scoringPoints = [],
+    answer = '',
+  } = payload;
+
+  const typeLabel = ESSAY_TYPE_LABEL[essayType] || '归纳概括';
+  const limitText = wordLimit ? `${wordLimit} 字以内` : '未限制字数';
+
+  const reference = referenceAnswer
+    ? `\n【参考答案】\n${referenceAnswer}\n`
+    : '';
+  const points = Array.isArray(scoringPoints) && scoringPoints.length
+    ? `\n【已知采分点】\n${scoringPoints.map((p, i) => `${i + 1}. ${typeof p === 'string' ? p : p.text || ''}`).join('\n')}\n`
+    : '\n【采分点】未提供，请你先从材料中自行提炼应得的采分点，再据此批改。\n';
+
+  return `请批改下面这道申论「${typeLabel}」题。
+
+【给定材料】
+${material}
+
+【题目要求】
+${requirement}
+字数要求：${limitText}
+${points}${reference}
+【考生答案】
+${answer}
+
+按下面的 JSON 结构输出批改结果：
+{
+  "score": 得分数字,
+  "maxScore": 满分数字,
+  "wordCount": 考生答案字数,
+  "dimensions": [
+    {"name":"要点覆盖","score":数字,"max":数字,"comment":"一句话点评"},
+    {"name":"概括层次","score":数字,"max":数字,"comment":"..."},
+    {"name":"语言规范","score":数字,"max":数字,"comment":"..."},
+    {"name":"字数控制","score":数字,"max":数字,"comment":"..."}
+  ],
+  "points": [
+    {"text":"采分点内容","hit":true或false,"evidence":"材料出处或考生原文","why":"漏掉时说明为什么该写、为什么容易漏"}
+  ],
+  "summary": "整体评价，两三句话",
+  "improvements": ["下次要注意的具体动作，两到四条"]
+}
+
+要点覆盖占分最重。points 数组要把所有采分点都列出来，命中的 hit 为 true。`;
+}
+
+async function callModelForJSON(settings, system, prompt, maxOutputTokens = 4096) {
+  const { type, client, model, settings: normalized } = createClient(settings);
+  if (type === 'anthropic') {
+    const response = await client.messages.create({
+      model,
+      max_tokens: maxOutputTokens,
+      system,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    return response.content?.[0]?.text || '';
+  }
+  return createOpenAITextResponse(client, model, normalized.apiFormat, {
+    instructions: system,
+    messages: [{ role: 'user', content: prompt }],
+    maxOutputTokens,
+  });
+}
+
+async function gradeEssay(settings, payload) {
+  try {
+    const text = await callModelForJSON(
+      settings,
+      ESSAY_GRADER_SYSTEM,
+      buildEssayGradePrompt(payload),
+      4096
+    );
+    const parsed = extractJSONObject(text);
+    if (!parsed) {
+      return { success: false, error: '模型没有返回可解析的批改结果，请重试' };
+    }
+    return { success: true, review: parsed };
+  } catch (error) {
+    return { success: false, error: compactError(error) };
+  }
+}
+
+const ESSAY_OCR_SYSTEM = `你是申论真题录入助手。从图片里原样提取给定材料和题目，不要改写、不要总结、不要补充。只输出 JSON。`;
+
+/** 从图片里扒出申论题：材料 / 题干 / 要求 / 字数 */
+async function recognizeEssay(settings, imageBase64, mimeType = 'image/png') {
+  const prompt = `识别这张图片里的申论题目，按下面的 JSON 输出：
+{
+  "title": "题目标题，没有就用题干前 20 字",
+  "essayType": "guina|duice|fenxi|guanche|dazuowen 之一",
+  "material": "给定材料全文，保留段落编号和换行",
+  "requirement": "作答要求原文",
+  "wordLimit": 字数上限数字，没有则 null,
+  "province": "省份，认不出填 null",
+  "year": 年份数字，认不出填 null
+}
+材料要一字不漏地抄下来，这是批改的依据。`;
+
+  try {
+    const { type, client, model, settings: normalized } = createClient(settings);
+    let text = '';
+    if (type === 'anthropic') {
+      const response = await client.messages.create({
+        model,
+        max_tokens: 8192,
+        system: ESSAY_OCR_SYSTEM,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mimeType, data: imageBase64 } },
+            { type: 'text', text: prompt },
+          ],
+        }],
+      });
+      text = response.content?.[0]?.text || '';
+    } else {
+      const response = await client.chat.completions.create({
+        model,
+        max_tokens: 8192,
+        messages: [
+          { role: 'system', content: ESSAY_OCR_SYSTEM },
+          {
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+              { type: 'text', text: prompt },
+            ],
+          },
+        ],
+      });
+      text = response.choices?.[0]?.message?.content || '';
+      void normalized;
+    }
+
+    const parsed = extractJSONObject(text);
+    if (!parsed) return { success: false, error: '没能从图片里识别出申论题，换一张更清晰的试试' };
+    return { success: true, prompt: parsed };
+  } catch (error) {
+    return { success: false, error: compactError(error) };
+  }
+}
+
 module.exports = {
   recognizeQuestions,
+  gradeEssay,
+  recognizeEssay,
   testConnection,
   chat,
   chatStream,

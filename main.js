@@ -278,6 +278,86 @@ ipcMain.handle("db:clearAllData", () => {
   return database.clearAllData();
 });
 
+// IPC 处理器 - 备考待办 / 笔记
+ipcMain.handle("todo:getTemplates", () => {
+  return database.getTodoTemplates();
+});
+
+ipcMain.handle("todo:saveTemplate", (event, input) => {
+  return database.saveTodoTemplate(input || {});
+});
+
+ipcMain.handle("todo:deleteTemplate", (event, templateId) => {
+  return database.deleteTodoTemplate(templateId);
+});
+
+ipcMain.handle("todo:reorderTemplates", (event, ids) => {
+  return database.reorderTodoTemplates(ids || []);
+});
+
+ipcMain.handle("todo:getDaily", (event, date) => {
+  return database.getDailyTodos(date);
+});
+
+ipcMain.handle("todo:addInstance", (event, input) => {
+  return database.addTodoInstance(input || {});
+});
+
+ipcMain.handle("todo:updateInstance", (event, input) => {
+  return database.updateTodoInstance(input || {});
+});
+
+ipcMain.handle("todo:deleteInstance", (event, id) => {
+  return database.deleteTodoInstance(id);
+});
+
+ipcMain.handle("todo:bumpProgress", (event, { kind, amount, date } = {}) => {
+  return database.bumpTodoProgress(kind, amount, date);
+});
+
+ipcMain.handle("todo:carryOver", (event, { ids, date } = {}) => {
+  return database.carryOverTodos(ids, date);
+});
+
+ipcMain.handle("todo:getStreak", (event, days) => {
+  return database.getTodoStreak(days);
+});
+
+ipcMain.handle("note:save", (event, input) => {
+  return database.saveNote(input || {});
+});
+
+ipcMain.handle("note:list", (event, options) => {
+  return database.getNotes(options || {});
+});
+
+ipcMain.handle("note:get", (event, id) => {
+  return database.getNote(id);
+});
+
+ipcMain.handle("note:delete", (event, id) => {
+  return database.deleteNote(id);
+});
+
+ipcMain.handle("note:search", (event, { keyword, options } = {}) => {
+  return database.searchNotes(keyword, options || {});
+});
+
+ipcMain.handle("note:tags", () => {
+  return database.getNoteTags();
+});
+
+// IPC 处理器 - 申论
+ipcMain.handle("essay:savePrompt", (event, input) => database.saveEssayPrompt(input || {}));
+ipcMain.handle("essay:listPrompts", (event, options) => database.getEssayPrompts(options || {}));
+ipcMain.handle("essay:getPrompt", (event, id) => database.getEssayPrompt(id));
+ipcMain.handle("essay:deletePrompt", (event, id) => database.deleteEssayPrompt(id));
+ipcMain.handle("essay:saveAttempt", (event, input) => database.saveEssayAttempt(input || {}));
+ipcMain.handle("essay:listAttempts", (event, options) => database.getEssayAttempts(options || {}));
+ipcMain.handle("essay:getAttempt", (event, id) => database.getEssayAttempt(id));
+ipcMain.handle("essay:deleteAttempt", (event, id) => database.deleteEssayAttempt(id));
+ipcMain.handle("essay:recommend", (event, options) => database.getEssayRecommendation(options || {}));
+
 ipcMain.handle("app:getInfo", () => {
   return updater.getAppInfo();
 });
@@ -391,6 +471,14 @@ ipcMain.handle("ai:chatStreamCancel", async (event, requestId) => {
   holder.abortController.abort();
   activeChatStreams.delete(id);
   return { success: true };
+});
+
+ipcMain.handle("ai:gradeEssay", async (event, { settings, payload }) => {
+  return aiService.gradeEssay(settings, payload || {});
+});
+
+ipcMain.handle("ai:recognizeEssay", async (event, { settings, imageBase64, mimeType }) => {
+  return aiService.recognizeEssay(settings, imageBase64, mimeType);
 });
 
 ipcMain.handle("ai:generatePaper", async (event, { settings, config }) => {

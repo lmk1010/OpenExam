@@ -92,7 +92,7 @@ function htmlToPlainText(html = '') {
 }
 
 /**
- * Convert saduck correctAnswer payloads into A/B/C… letters.
+ * Convert legacy correctAnswer payloads into A/B/C… letters.
  * Rejects out-of-range indexes that previously produced characters like `}`.
  */
 function convertAnswer(value) {

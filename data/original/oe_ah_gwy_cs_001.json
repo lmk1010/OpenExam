@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "paper": {
+    "id": "paper_oe_ah_gwy_cs_001",
+    "title": "安徽公务员 计算机专业科目 原创模考 001",
+    "examKind": "gongwuyuan",
+    "examLevel": "provincial",
+    "region": "anhui",
+    "subject": "computer",
+    "year": 2026,
+    "durationMin": 120,
+    "source": "original",
+    "syllabus": "安徽省2026年度考试录用公务员专业科目笔试大纲·计算机类（公开考点）",
+    "note": "按公开大纲章节自拟题干、选项、答案和解析。不是某年真题的改写或回忆还原。"
+  },
+  "questions": [
+    {
+      "id": "oe_ah_gwy_cs_001_q01",
+      "orderNum": 1,
+      "category": "cs_base",
+      "subCategory": "encoding",
+      "difficulty": 2,
+      "content": "将二进制数 101101 转换为十进制，结果是：",
+      "options": [
+        { "key": "A", "text": "41" },
+        { "key": "B", "text": "45" },
+        { "key": "C", "text": "47" },
+        { "key": "D", "text": "53" }
+      ],
+      "answer": "B",
+      "analysis": "按权展开：1×32 + 0×16 + 1×8 + 1×4 + 0×2 + 1×1 = 32+8+4+1 = 45。故选 B。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q02",
+      "orderNum": 2,
+      "category": "cs_base",
+      "subCategory": "hardware",
+      "difficulty": 2,
+      "content": "下列部件中，断电后其中信息通常会丢失的是：",
+      "options": [
+        { "key": "A", "text": "机械硬盘" },
+        { "key": "B", "text": "固态硬盘" },
+        { "key": "C", "text": "内存（DRAM）" },
+        { "key": "D", "text": "只读存储器 ROM" }
+      ],
+      "answer": "C",
+      "analysis": "DRAM 靠电容刷新保存数据，断电即失。硬盘、SSD、ROM 属非易失存储。故选 C。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q03",
+      "orderNum": 3,
+      "category": "cs_base",
+      "subCategory": "os",
+      "difficulty": 2,
+      "content": "关于操作系统，下列说法正确的是：",
+      "options": [
+        { "key": "A", "text": "操作系统只负责管理文件，不管处理机" },
+        { "key": "B", "text": "Windows、Linux、macOS 都属于操作系统，但接口和内核实现不同" },
+        { "key": "C", "text": "浏览器属于操作系统内核的一部分" },
+        { "key": "D", "text": "操作系统不能同时管理内存和外部设备" }
+      ],
+      "answer": "B",
+      "analysis": "操作系统管理处理机、内存、设备和文件。浏览器是应用，不是内核。B 正确。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q04",
+      "orderNum": 4,
+      "category": "cs_base",
+      "subCategory": "newtech",
+      "difficulty": 2,
+      "content": "把计算、存储等资源通过网络按需交付，使用方可按用量付费。这描述的主要是：",
+      "options": [
+        { "key": "A", "text": "单机虚拟内存" },
+        { "key": "B", "text": "云计算" },
+        { "key": "C", "text": "编译优化" },
+        { "key": "D", "text": "磁盘碎片整理" }
+      ],
+      "answer": "B",
+      "analysis": "按需、网络交付、计量付费是云计算的典型特征，与本机虚拟内存或编译无关。故选 B。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q05",
+      "orderNum": 5,
+      "category": "cs_security",
+      "subCategory": "malware",
+      "difficulty": 2,
+      "content": "计算机病毒区别于普通故障程序的典型特征是：",
+      "options": [
+        { "key": "A", "text": "必须用汇编语言编写" },
+        { "key": "B", "text": "只能破坏硬件电路" },
+        { "key": "C", "text": "具有传染性，能把自身代码附着到其他程序或文件" },
+        { "key": "D", "text": "一旦运行就会立即格式化所有磁盘" }
+      ],
+      "answer": "C",
+      "analysis": "病毒的定义要点是传染（自我复制/附着）。不一定用汇编，也不必然破坏硬件或立刻格式化。故选 C。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q06",
+      "orderNum": 6,
+      "category": "cs_security",
+      "subCategory": "firewall",
+      "difficulty": 3,
+      "content": "防火墙最主要的作用是：",
+      "options": [
+        { "key": "A", "text": "提高 CPU 主频" },
+        { "key": "B", "text": "在受保护网络与外部网络之间按策略过滤通信" },
+        { "key": "C", "text": "替代杀毒软件完成所有查杀" },
+        { "key": "D", "text": "自动修复硬盘坏道" }
+      ],
+      "answer": "B",
+      "analysis": "防火墙是边界访问控制，按规则放行或阻断。它不提升主频、不包办杀毒、不修硬盘。故选 B。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q07",
+      "orderNum": 7,
+      "category": "cs_windows",
+      "subCategory": "files",
+      "difficulty": 1,
+      "content": "在 Windows 资源管理器中，要把文件移动到同一磁盘的另一文件夹，最直接的操作通常是：",
+      "options": [
+        { "key": "A", "text": "剪切后粘贴" },
+        { "key": "B", "text": "只能用命令行，图形界面做不到" },
+        { "key": "C", "text": "先格式化目标盘再复制" },
+        { "key": "D", "text": "必须先发送到压缩包" }
+      ],
+      "answer": "A",
+      "analysis": "同盘移动对应剪切+粘贴（或拖拽为移动）。不必格式化，也不必先压缩。故选 A。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q08",
+      "orderNum": 8,
+      "category": "cs_office",
+      "subCategory": "word",
+      "difficulty": 2,
+      "content": "在 Word 中，希望长文档各级标题外观一致，并便于之后自动生成目录，应优先使用：",
+      "options": [
+        { "key": "A", "text": "每级标题手动改一次字号和加粗" },
+        { "key": "B", "text": "标题样式（如标题 1、标题 2）" },
+        { "key": "C", "text": "把标题做成文本框并旋转" },
+        { "key": "D", "text": "全部设为嵌入型图片" }
+      ],
+      "answer": "B",
+      "analysis": "样式统一格式，目录域依赖标题样式级别。手改字号难一致，文本框和图片不能当目录源。故选 B。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q09",
+      "orderNum": 9,
+      "category": "cs_office",
+      "subCategory": "excel",
+      "difficulty": 3,
+      "content": "Excel 中，要计算 B 列里「部门为办公室」的人数合计，且人数在 C 列，下列函数用法最合适的是：",
+      "options": [
+        { "key": "A", "text": "SUM(C:C)" },
+        { "key": "B", "text": "SUMIF(B:B,\"办公室\",C:C)" },
+        { "key": "C", "text": "NOW()" },
+        { "key": "D", "text": "LEN(B1)" }
+      ],
+      "answer": "B",
+      "analysis": "SUMIF 按条件求和：条件在 B 列等于「办公室」，对 C 列求和。SUM 无条件，NOW 是时间，LEN 是字符长度。故选 B。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q10",
+      "orderNum": 10,
+      "category": "cs_prog",
+      "subCategory": "c",
+      "difficulty": 3,
+      "content": "C 语言中，若有 int a[5]; 则 a[5] 表示：",
+      "options": [
+        { "key": "A", "text": "数组的合法第 5 个元素（下标从 1 到 5）" },
+        { "key": "B", "text": "越界访问，合法下标是 0 到 4" },
+        { "key": "C", "text": "数组长度本身" },
+        { "key": "D", "text": "自动等于 a[0]+a[4]" }
+      ],
+      "answer": "B",
+      "analysis": "C 数组下标从 0 开始，长度为 5 时合法下标 0–4。a[5] 越界，既不是长度也不是两元素之和。故选 B。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q11",
+      "orderNum": 11,
+      "category": "cs_prog",
+      "subCategory": "c",
+      "difficulty": 3,
+      "content": "关于 C 语言指针，下列说法正确的是：",
+      "options": [
+        { "key": "A", "text": "指针变量里存放的是地址" },
+        { "key": "B", "text": "指针只能指向字符，不能指向整数" },
+        { "key": "C", "text": "定义指针后不必初始化就可以安全解引用" },
+        { "key": "D", "text": "指针与数组没有任何关系" }
+      ],
+      "answer": "A",
+      "analysis": "指针存地址，可指向多种类型。未初始化就解引用是未定义行为。数组名在多数表达式中会转换为指向首元素的指针。故选 A。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q12",
+      "orderNum": 12,
+      "category": "cs_db",
+      "subCategory": "sql",
+      "difficulty": 2,
+      "content": "要从表 staff 中查出 dept 为「信息科」的全部行，SQL 应写成：",
+      "options": [
+        { "key": "A", "text": "GET staff WHEN dept = 信息科" },
+        { "key": "B", "text": "SELECT * FROM staff WHERE dept = '信息科'" },
+        { "key": "C", "text": "OPEN staff FILTER 信息科" },
+        { "key": "D", "text": "DISPLAY staff.dept == 信息科" }
+      ],
+      "answer": "B",
+      "analysis": "标准查询是 SELECT … FROM … WHERE …。字符串要用引号。A、C、D 不是 SQL。故选 B。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q13",
+      "orderNum": 13,
+      "category": "cs_db",
+      "subCategory": "theory",
+      "difficulty": 3,
+      "content": "事务的 ACID 中，I 表示：",
+      "options": [
+        { "key": "A", "text": "完整性 Integrity，与外键无关的另一种叫法" },
+        { "key": "B", "text": "隔离性 Isolation，并发事务互不干扰到约定程度" },
+        { "key": "C", "text": "索引 Index" },
+        { "key": "D", "text": "互联网 Internet" }
+      ],
+      "answer": "B",
+      "analysis": "A 原子性、C 一致性、I 隔离性、D 持久性。I 是 Isolation。故选 B。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q14",
+      "orderNum": 14,
+      "category": "cs_net",
+      "subCategory": "tcpip",
+      "difficulty": 2,
+      "content": "在 TCP/IP 四层模型中，IP 协议主要工作在：",
+      "options": [
+        { "key": "A", "text": "应用层" },
+        { "key": "B", "text": "传输层" },
+        { "key": "C", "text": "网际层（网络层）" },
+        { "key": "D", "text": "物理层线缆内部" }
+      ],
+      "answer": "C",
+      "analysis": "IP 负责寻址与分组转发，在网际层。TCP/UDP 在传输层，HTTP 等在应用层。故选 C。"
+    },
+    {
+      "id": "oe_ah_gwy_cs_001_q15",
+      "orderNum": 15,
+      "category": "cs_se",
+      "subCategory": "process",
+      "difficulty": 2,
+      "content": "瀑布模型的主要特点是：",
+      "options": [
+        { "key": "A", "text": "阶段严格顺序推进，大体上前一阶段完成后再进入下一阶段" },
+        { "key": "B", "text": "没有文档，只靠口头约定" },
+        { "key": "C", "text": "每天必须发布正式生产版本" },
+        { "key": "D", "text": "禁止进行测试" }
+      ],
+      "answer": "A",
+      "analysis": "瀑布是线性阶段模型：需求、设计、实现、测试等顺序展开。它通常强调文档，不是无文档、也不是日更生产或禁止测试。故选 A。"
+    }
+  ]
+}

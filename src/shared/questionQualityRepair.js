@@ -10,26 +10,26 @@ const {
 } = require('./questionQuality');
 
 const KNOWN_ANSWER_FIXES = {
-  paper_saduck_19501_q100: 'C',
-  paper_saduck_19486_q100: 'C',
-  paper_saduck_19488_q91: 'C',
-  paper_saduck_19465_q25: 'B',
+  paper_oe_19501_q100: 'C',
+  paper_oe_19486_q100: 'C',
+  paper_oe_19488_q91: 'C',
+  paper_oe_19465_q25: 'B',
 };
 
 const KNOWN_OPTION_FIXES = {
-  paper_saduck_19382_q128: [
+  paper_oe_19382_q128: [
     { key: 'A', content: '33%' },
     { key: 'B', content: '55%' },
     { key: 'C', content: '77%' },
     { key: 'D', content: '99%' },
   ],
-  paper_saduck_19410_q129: [
+  paper_oe_19410_q129: [
     { key: 'A', content: 'V₃<V₁<V₂' },
     { key: 'B', content: 'V₂<V₃<V₁' },
     { key: 'C', content: 'V₃<V₂<V₁' },
     { key: 'D', content: 'V₁<V₃<V₂' },
   ],
-  paper_saduck_19411_q124: [
+  paper_oe_19411_q124: [
     { key: 'A', content: 'V₃<V₁<V₂' },
     { key: 'B', content: 'V₂<V₃<V₁' },
     { key: 'C', content: 'V₃<V₂<V₁' },

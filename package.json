@@ -13,12 +13,14 @@
     "dist:mac": "npm run build && electron-builder --mac dmg zip",
     "dist:win": "npm run build && electron-builder --win nsis",
     "rebuild:electron": "electron-builder install-app-deps",
-    "crawl:saduck": "ELECTRON_RUN_AS_NODE=1 electron scripts/crawl-saduck.js",
-    "crawl:saduck:probe": "ELECTRON_RUN_AS_NODE=1 electron scripts/crawl-saduck.js --probe-fields",
-    "build:saduck-seed": "ELECTRON_RUN_AS_NODE=1 electron scripts/build-saduck-seed.js",
-    "sync:saduck-seed": "ELECTRON_RUN_AS_NODE=1 electron scripts/import-saduck.js",
+    "build:seed": "ELECTRON_RUN_AS_NODE=1 electron scripts/build-seed.js",
+    "sync:seed": "ELECTRON_RUN_AS_NODE=1 electron scripts/sync-seed.js",
+    "sanitize:seed": "ELECTRON_RUN_AS_NODE=1 electron scripts/sanitize-seed.js",
+    "rewrite:analyses": "python3 scripts/original/rewrite_seed_analyses.py",
+    "export:papers": "python3 scripts/original/export_all_papers.py",
     "patch:question-quality": "ELECTRON_RUN_AS_NODE=1 electron scripts/patch-question-quality.js --seed",
-    "audit:question-bank": "ELECTRON_RUN_AS_NODE=1 electron scripts/audit-question-bank.js"
+    "audit:question-bank": "ELECTRON_RUN_AS_NODE=1 electron scripts/audit-question-bank.js",
+    "tag:skill-points": "ELECTRON_RUN_AS_NODE=1 electron scripts/tag-skill-points.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.72.1",

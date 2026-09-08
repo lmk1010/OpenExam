@@ -1,0 +1,174 @@
+{
+  "paper": {
+    "id": "paper_oe_xingce_001",
+    "title": "OpenExam 原创行测样卷 001",
+    "year": 2026,
+    "type": "mock",
+    "subject": "xingce",
+    "source": "original",
+    "note": "考点自拟。不是任何一年国考/省考原卷的改写。"
+  },
+  "questions": [
+    {
+      "id": "oe_xingce_001_q01",
+      "paperId": "paper_oe_xingce_001",
+      "paperTitle": "OpenExam 原创行测样卷 001",
+      "year": 2026,
+      "orderNum": 1,
+      "category": "changshi",
+      "subCategory": "falv",
+      "difficulty": 2,
+      "source": "original",
+      "content": "根据现行宪法，下列哪项职权属于全国人民代表大会常务委员会？",
+      "options": [
+        { "key": "A", "text": "修改宪法" },
+        { "key": "B", "text": "选举国家主席、副主席" },
+        { "key": "C", "text": "解释宪法、监督宪法的实施" },
+        { "key": "D", "text": "批准省、自治区和直辖市的建置" }
+      ],
+      "answer": "C",
+      "analysis": "宪法规定：修改宪法，选举国家主席、副主席，批准省、自治区和直辖市的建置，属于全国人民代表大会。全国人大常委会解释宪法、监督宪法的实施。故选 C。"
+    },
+    {
+      "id": "oe_xingce_001_q02",
+      "paperId": "paper_oe_xingce_001",
+      "paperTitle": "OpenExam 原创行测样卷 001",
+      "year": 2026,
+      "orderNum": 2,
+      "category": "yanyu",
+      "subCategory": "xuanci",
+      "difficulty": 2,
+      "source": "original",
+      "content": "科研团队把冷门文献从库房重新编目上架，不是为了制造话题，而是让后来的人____到材料本身。填入画横线部分最恰当的一项是：",
+      "options": [
+        { "key": "A", "text": "沉溺" },
+        { "key": "B", "text": "接触" },
+        { "key": "C", "text": "膜拜" },
+        { "key": "D", "text": "消费" }
+      ],
+      "answer": "B",
+      "analysis": "后半句强调「材料本身」可被后来者使用。沉溺、膜拜、消费都带态度偏移，接触是中性、可核对的动作。故选 B。"
+    },
+    {
+      "id": "oe_xingce_001_q03",
+      "paperId": "paper_oe_xingce_001",
+      "paperTitle": "OpenExam 原创行测样卷 001",
+      "year": 2026,
+      "orderNum": 3,
+      "category": "yanyu",
+      "subCategory": "yueduan",
+      "difficulty": 3,
+      "source": "original",
+      "content": "有人把「本地优先」理解成不联网。真正卡住学习产品的，往往不是服务器在不在，而是内容从哪来、答案能不能复核。一套只存在于网盘里的题库，安装包再离线，权利关系也不会变。这段文字意在说明：",
+      "options": [
+        { "key": "A", "text": "离线安装可以规避内容授权问题" },
+        { "key": "B", "text": "学习产品的关键约束是内容来源与可复核性，而不是是否联网" },
+        { "key": "C", "text": "网盘分发比应用内置更安全" },
+        { "key": "D", "text": "本地优先等于不需要题库" }
+      ],
+      "answer": "B",
+      "analysis": "主旨在第二句：卡住产品的是内容来源和能否复核，不是服务器。A、C 与文意相反，D 过度推断。故选 B。"
+    },
+    {
+      "id": "oe_xingce_001_q04",
+      "paperId": "paper_oe_xingce_001",
+      "paperTitle": "OpenExam 原创行测样卷 001",
+      "year": 2026,
+      "orderNum": 4,
+      "category": "shuliang",
+      "subCategory": "jisuan",
+      "difficulty": 2,
+      "source": "original",
+      "content": "一条生产线每小时产 120 件。上午开工 3.5 小时后检修 20 分钟，随后以原效率的 80% 再工作 2 小时。这一班共生产多少件？",
+      "options": [
+        { "key": "A", "text": "564" },
+        { "key": "B", "text": "612" },
+        { "key": "C", "text": "636" },
+        { "key": "D", "text": "660" }
+      ],
+      "answer": "B",
+      "analysis": "前段：120×3.5=420。后段：120×0.8×2=192。合计 612。检修时间不生产。故选 B。"
+    },
+    {
+      "id": "oe_xingce_001_q05",
+      "paperId": "paper_oe_xingce_001",
+      "paperTitle": "OpenExam 原创行测样卷 001",
+      "year": 2026,
+      "orderNum": 5,
+      "category": "panduan",
+      "subCategory": "dingyi",
+      "difficulty": 2,
+      "source": "original",
+      "content": "可验收交付：事先写明输入、输出、完成标准和失败时如何转交人工，交付后能按该标准核对。根据上述定义，下列属于可验收交付的是：",
+      "options": [
+        { "key": "A", "text": "约定「把体验做好」，上线后双方对什么叫做好意见不一" },
+        { "key": "B", "text": "约定一周内把 20 条售后话术接到工单系统，抽检 20 条均能按规则回复并留下日志" },
+        { "key": "C", "text": "约定效果「不输大厂」，以对方主观感受为准" },
+        { "key": "D", "text": "先开工，范围以后再补" }
+      ],
+      "answer": "B",
+      "analysis": "定义要点：事先写清输入输出和完成标准，事后能核对。B 有数量、系统和抽检标准。A、C 不可核，D 没有事先标准。故选 B。"
+    },
+    {
+      "id": "oe_xingce_001_q06",
+      "paperId": "paper_oe_xingce_001",
+      "paperTitle": "OpenExam 原创行测样卷 001",
+      "year": 2026,
+      "orderNum": 6,
+      "category": "panduan",
+      "subCategory": "luoji",
+      "difficulty": 3,
+      "source": "original",
+      "content": "某工作室只做三件事：出原创题、做批改、管学习计划。已知：凡是带机构解析的题库都不出原创题；凡是做出原创题的，都做批改。由此可以推出：",
+      "options": [
+        { "key": "A", "text": "做批改的都不带机构解析" },
+        { "key": "B", "text": "带机构解析的都不做批改" },
+        { "key": "C", "text": "带机构解析的都不出原创题" },
+        { "key": "D", "text": "管学习计划的都出原创题" }
+      ],
+      "answer": "C",
+      "analysis": "题干已给：带机构解析 → 不出原创题。C 是原句。A、B 把「出原创题 → 做批改」错误换位。D 无根据。故选 C。"
+    },
+    {
+      "id": "oe_xingce_001_q07",
+      "paperId": "paper_oe_xingce_001",
+      "paperTitle": "OpenExam 原创行测样卷 001",
+      "year": 2026,
+      "orderNum": 7,
+      "category": "panduan",
+      "subCategory": "leibi",
+      "difficulty": 2,
+      "source": "original",
+      "content": "种子库 之于 安装包 相当于：",
+      "options": [
+        { "key": "A", "text": "教材 之于 印刷厂" },
+        { "key": "B", "text": "乐谱 之于 播放器" },
+        { "key": "C", "text": "发票 之于 税率" },
+        { "key": "D", "text": "地图 之于 比例尺" }
+      ],
+      "answer": "B",
+      "analysis": "种子库是被分发的内容，安装包是承载和运行它的容器。乐谱是内容，播放器是容器。A 是产物与生产者，C、D 是对象与属性。故选 B。"
+    },
+    {
+      "id": "oe_xingce_001_q08",
+      "paperId": "paper_oe_xingce_001",
+      "paperTitle": "OpenExam 原创行测样卷 001",
+      "year": 2026,
+      "orderNum": 8,
+      "category": "ziliao",
+      "subCategory": "biaoge",
+      "difficulty": 3,
+      "source": "original",
+      "content": "青石市公共图书馆借阅情况如下（单位：万册）。问：2025 年电子资源借阅册次约占当年纸质与电子合计的：",
+      "contentHtml": "<p>青石市公共图书馆借阅情况（万册）</p><table border=\"1\" cellpadding=\"6\"><thead><tr><th>年份</th><th>纸质图书</th><th>电子资源</th></tr></thead><tbody><tr><td>2021</td><td>82</td><td>18</td></tr><tr><td>2022</td><td>79</td><td>27</td></tr><tr><td>2023</td><td>76</td><td>39</td></tr><tr><td>2024</td><td>74</td><td>52</td></tr><tr><td>2025</td><td>71</td><td>68</td></tr></tbody></table><p>2025 年电子资源借阅册次约占当年纸质与电子合计的：</p>",
+      "options": [
+        { "key": "A", "text": "41%" },
+        { "key": "B", "text": "45%" },
+        { "key": "C", "text": "49%" },
+        { "key": "D", "text": "53%" }
+      ],
+      "answer": "C",
+      "analysis": "2025 年合计 71+68=139。电子占比 68÷139≈0.489，约 49%。故选 C。表内数据为 OpenExam 自拟，不是任何公开统计年报的摘录。"
+    }
+  ]
+}

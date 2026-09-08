@@ -76,7 +76,7 @@ OpenExam 是一个基于 `Electron + React + SQLite` 的桌面端学习平台，
 - `首启初始化`：应用首次启动时自动解压种子库到用户目录 `openexam.db`。
 - `题图离线化`：题图单独存放在 `question-assets/`，题目 HTML 中引用 `openexam-asset://question-assets/...`。
 - `本地解析`：Electron 主进程负责把资源协议映射到本地文件，开发环境与打包环境统一可用。
-- `更新链路`：抓取流程为“爬题 → 本地化题图 → 生成种子库 → 同步本地 SQLite”，数据结构更稳定。
+- `更新链路`：自制 JSON / 导入包 → 生成种子库 → 同步本地 SQLite。不再从第三方站点爬题。
 
 ## 快速开始
 
@@ -95,13 +95,13 @@ npm run build
 npm run rebuild:electron
 
 # 从本地官方库重建种子库
-npm run build:saduck-seed
+npm run build:seed
 
 # 将种子库同步到本地用户数据库
-npm run sync:saduck-seed
+npm run sync:seed
 
-# 重新抓取官方题库并更新种子库/本地库
-npm run crawl:saduck
+# 清理种子库中的第三方标记（ID / 文案）
+npm run sanitize:seed
 
 # 本地打包 macOS
 npm run dist:mac

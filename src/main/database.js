@@ -7,6 +7,7 @@ const { normalizeQuestionTaxonomy, isFakeQuestion } = require('../shared/questio
 const { hasUsableMaterial, isPracticeableQuestion, parseOptions } = require('../shared/questionQuality');
 const { patchQuestionDatabase } = require('../shared/questionQualityRepair');
 const achievementCatalog = require('../shared/achievementCatalog.json');
+const studyPlan = require('./studyPlan.js');
 
 let db = null;
 
@@ -401,6 +402,13 @@ function initDatabase() {
   ensureQuestionsSchema();
   normalizePaperProvinceData();
 
+  // 备考待办 / 笔记 / 申论 / 词语 数据层
+  try {
+    studyPlan.initStudyPlan(db);
+  } catch (error) {
+    console.error('备考待办模块初始化失败:', error);
+  }
+
   try {
     repairQuestionQuality();
   } catch (error) {
@@ -510,6 +518,9 @@ function normalizePracticeMeta(meta) {
 
 function savePracticeRecord(record) {
   const meta = normalizePracticeMeta(record.meta);
+  // 只在本次由「未完成」跨到「已完成」时回写待办，避免答题中途的自动保存重复计数
+  const previous = db.prepare('SELECT status FROM practice_records WHERE id = ?').get(record.id);
+  const justCompleted = record.status === 'completed' && previous?.status !== 'completed';
   const stmt = db.prepare(`
     INSERT OR REPLACE INTO practice_records
     (id, paper_id, category, sub_category, start_time, end_time, duration, status, answers, correct_count, total_count, accuracy, score, meta)
@@ -531,6 +542,19 @@ function savePracticeRecord(record) {
     record.score || 0,
     meta ? JSON.stringify(meta) : null
   );
+
+  if (justCompleted) {
+    try {
+      const answered = Number(record.totalCount) || Object.keys(record.answers || {}).length;
+      if (answered > 0) {
+        // 逻辑填空即是词语积累的练法，单独计入词语待办
+        const kind = record.subCategory === 'xuanci' ? 'vocab' : 'drill';
+        studyPlan.bumpTodoProgress(kind, answered);
+      }
+    } catch (error) {
+      console.error('回写待办进度失败:', error);
+    }
+  }
 }
 
 // 获取练习记录
@@ -1942,6 +1966,7 @@ function closeDatabase() {
 
 module.exports = {
   initDatabase,
+  ...studyPlan,
   getPapers,
   getQuestionsByPaperId,
   getQuestionsByIds,

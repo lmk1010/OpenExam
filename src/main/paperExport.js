@@ -19,9 +19,9 @@ function renderRichHtml(value) {
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/\son\w+=("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
     .replace(/src=(['"])\/\//gi, 'src=$1https://')
-    .replace(/src=(['"])\/(?!\/)/gi, 'src=$1https://saduck.top/')
+    .replace(/src=(['"])\/(?!\/)/gi, 'src=$1')
     .replace(/href=(['"])\/\//gi, 'href=$1https://')
-    .replace(/href=(['"])\/(?!\/)/gi, 'href=$1https://saduck.top/');
+    .replace(/href=(['"])\/(?!\/)/gi, 'href=$1');
 }
 
 function safeFilename(value = 'openexam-paper') {

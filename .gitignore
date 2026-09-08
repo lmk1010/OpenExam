@@ -31,3 +31,15 @@ data/openexam.seed.db
 data/openexam.seed.db-wal
 data/openexam.seed.db-shm
 data/saduck-papers.json
+data/saduck-field-probe.json
+
+# 原创解析 / 配图的跑批工作目录。
+# 成品已经进了 data/question-assets 和种子库，这里剩下的是 20MB 生成源
+# 和断点状态 —— 每跑一次就变，不该进仓库。文档、台账、样例 json 留着。
+data/original/assets/
+data/original/previews/
+data/original/analysis_checkpoint.json
+data/original/image_loop.json
+
+# 别的项目的图误放进来过，别再收进来
+/assets/spain-*

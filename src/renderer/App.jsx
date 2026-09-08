@@ -1,4 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
+import Today from "./pages/Today.jsx";
+import Notes from "./pages/Notes.jsx";
+import Essay from "./pages/Essay.jsx";
 import PaperList from "./pages/PaperList.jsx";
 import PracticeModule from "./pages/PracticeModule.jsx";
 import PracticeHistory from "./pages/PracticeHistory.jsx";
@@ -22,10 +25,8 @@ import { useDialog } from "./components/DialogProvider.jsx";
 const EXAM_TRACK_STORAGE_KEY = "openexam_exam_track_v1";
 const EXAM_TRACK_SETTING_KEY = "exam_track";
 const EXAM_TRACK_OPTIONS = [
-  { key: "gongkao", label: "考公" },
+  { key: "gongkao", label: "公务员" },
   { key: "shiye", label: "事业单位" },
-  { key: "kaoyan", label: "考研" },
-  { key: "self", label: "自定义" },
 ];
 
 function normalizeExamTrack(input) {
@@ -34,7 +35,7 @@ function normalizeExamTrack(input) {
 }
 
 function getExamTrackLabel(track) {
-  return EXAM_TRACK_OPTIONS.find((item) => item.key === track)?.label || "考公";
+  return EXAM_TRACK_OPTIONS.find((item) => item.key === track)?.label || "公务员";
 }
 
 function PageView({ fullscreen = false, children, className = "" }) {
@@ -205,7 +206,7 @@ const DynamicChart = ({ data, onHover }) => {
 export default function App() {
   const ONBOARDING_STORAGE_KEY = "openexam_onboarding_done_v1";
   const [theme, setTheme] = useState("light");
-  const [page, setPage] = useState("home");
+  const [page, setPage] = useState("today");
   const [examTrack, setExamTrack] = useState(() => {
     try {
       return normalizeExamTrack(localStorage.getItem(EXAM_TRACK_STORAGE_KEY));
@@ -216,7 +217,7 @@ export default function App() {
   const [currentPaperId, setCurrentPaperId] = useState(null);
   const [examResult, setExamResult] = useState(null);
   const [resultReturnPage, setResultReturnPage] = useState("papers");
-  const [activeTab, setActiveTab] = useState("学习中心");
+  const [activeTab, setActiveTab] = useState("今日");
   const [practiceQuestions, setPracticeQuestions] = useState(null); // 专项练习题目
   const [practiceConfig, setPracticeConfig] = useState(null); // 练习配置
   const [examResumeRecord, setExamResumeRecord] = useState(null);
@@ -455,7 +456,8 @@ export default function App() {
     papers: "模拟考试",
     "ai-generate": "AI出卷",
     "wrong-book": "",
-  }[targetPage] || "学习中心");
+    home: "学习中心",
+  }[targetPage] || "今日");
 
   const hasAnyAnswer = (record) => {
     if (!record?.answers || typeof record.answers !== 'object') return false;
@@ -860,6 +862,7 @@ export default function App() {
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     const tabPageMap = {
+      "今日": "today",
       "学习中心": "home",
       "题库练习": "practice",
       "模拟考试": "papers",
@@ -957,6 +960,21 @@ export default function App() {
           </button>
           <div className="rail-icons">
             <div className="rail-slider" />
+            {/* 申论 */}
+            <button className={`rail-icon essay ${page === 'essay' ? 'active' : ''}`} data-tip="申论" onClick={() => { setActiveTab(''); setPage('essay'); }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>
+              </svg>
+              <span className="rail-icon-text">申论</span>
+            </button>
+            {/* 笔记 */}
+            <button className={`rail-icon notes ${page === 'notes' ? 'active' : ''}`} data-tip="笔记" onClick={() => { setActiveTab(''); setPage('notes'); }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="15" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>
+              </svg>
+              <span className="rail-icon-text">笔记</span>
+            </button>
             {/* 错题本 */}
             <button className={`rail-icon wrong-book ${page === 'wrong-book' ? 'active' : ''}`} data-tip="错题本" onClick={() => { setActiveTab(''); setPage('wrong-book'); }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -982,7 +1000,7 @@ export default function App() {
           </div>
           <div className="rail-divider" />
           <div className="rail-bottom">
-            <button className={`rail-bottom-icon home-icon ${!['wrong-book','analytics','ai-teacher'].includes(page) ? 'active' : ''}`} data-tip="工作区" onClick={() => { setActiveTab('学习中心'); setPage('home'); }}>
+            <button className={`rail-bottom-icon home-icon ${!['wrong-book','analytics','ai-teacher','notes','essay'].includes(page) ? 'active' : ''}`} data-tip="工作区" onClick={() => { setActiveTab('今日'); setPage('today'); }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
                 <polyline points="9 22 9 12 15 12 15 22"/>
@@ -1008,7 +1026,7 @@ export default function App() {
         <section className="workspace">
           <header className="workspace-header">
             <div className="workspace-header-main">
-              <button className="app-brand" type="button" onClick={() => { setActiveTab('学习中心'); setPage('home'); }}>
+              <button className="app-brand" type="button" onClick={() => { setActiveTab('今日'); setPage('today'); }}>
                 <img src={appLogo} alt="OpenExam" className="app-brand-logo" />
                 <div className="app-brand-copy">
                   <strong>OpenExam</strong>
@@ -1016,7 +1034,7 @@ export default function App() {
                 </div>
               </button>
               <nav className="tabs">
-                {["学习中心", "题库练习", "模拟考试", "AI出卷", "我的成长"].map(tab => (
+                {["今日", "学习中心", "题库练习", "模拟考试", "AI出卷", "我的成长"].map(tab => (
                   <button key={tab} className={`tab ${activeTab === tab ? "active" : ""}`} onClick={() => handleTabChange(tab)}>
                     {tab}
                   </button>
@@ -1103,7 +1121,18 @@ export default function App() {
 
           <div className="workspace-body">
             <PageView key={page}>
-              {page === "papers" ? (
+              {page === "today" ? (
+                <Today
+                  onStartDrill={() => { setActiveTab('题库练习'); setPage('practice'); }}
+                  onStartVocab={() => { setActiveTab('题库练习'); handleStartPractice('yanyu', 'xuanci', { questionCount: 15, mode: 'practice', shuffle: true }); }}
+                  onStartEssay={() => { setActiveTab(''); setPage('essay'); }}
+                  onOpenNotes={() => { setActiveTab(''); setPage('notes'); }}
+                />
+              ) : page === "essay" ? (
+                <Essay />
+              ) : page === "notes" ? (
+                <Notes onBack={() => { setActiveTab('今日'); setPage('today'); }} />
+              ) : page === "papers" ? (
                 <PaperList
                   onOpenPaper={(paper) => handleOpenPaper(paper, 'papers')}
                   initialKeyword={paperSearchKeyword}

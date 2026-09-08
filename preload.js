@@ -55,6 +55,44 @@ contextBridge.exposeInMainWorld("openexam", {
     clearAllData: () => ipcRenderer.invoke("db:clearAllData"),
   },
 
+  // 备考待办
+  todo: {
+    getTemplates: () => ipcRenderer.invoke("todo:getTemplates"),
+    saveTemplate: (input) => ipcRenderer.invoke("todo:saveTemplate", input),
+    deleteTemplate: (templateId) => ipcRenderer.invoke("todo:deleteTemplate", templateId),
+    reorderTemplates: (ids) => ipcRenderer.invoke("todo:reorderTemplates", ids),
+    getDaily: (date) => ipcRenderer.invoke("todo:getDaily", date),
+    addInstance: (input) => ipcRenderer.invoke("todo:addInstance", input),
+    updateInstance: (input) => ipcRenderer.invoke("todo:updateInstance", input),
+    deleteInstance: (id) => ipcRenderer.invoke("todo:deleteInstance", id),
+    bumpProgress: (kind, amount, date) => ipcRenderer.invoke("todo:bumpProgress", { kind, amount, date }),
+    carryOver: (ids, date) => ipcRenderer.invoke("todo:carryOver", { ids, date }),
+    getStreak: (days) => ipcRenderer.invoke("todo:getStreak", days),
+  },
+
+  // 笔记与知识库
+  note: {
+    save: (input) => ipcRenderer.invoke("note:save", input),
+    list: (options) => ipcRenderer.invoke("note:list", options),
+    get: (id) => ipcRenderer.invoke("note:get", id),
+    remove: (id) => ipcRenderer.invoke("note:delete", id),
+    search: (keyword, options) => ipcRenderer.invoke("note:search", { keyword, options }),
+    tags: () => ipcRenderer.invoke("note:tags"),
+  },
+
+  // 申论
+  essay: {
+    savePrompt: (input) => ipcRenderer.invoke("essay:savePrompt", input),
+    listPrompts: (options) => ipcRenderer.invoke("essay:listPrompts", options),
+    getPrompt: (id) => ipcRenderer.invoke("essay:getPrompt", id),
+    deletePrompt: (id) => ipcRenderer.invoke("essay:deletePrompt", id),
+    saveAttempt: (input) => ipcRenderer.invoke("essay:saveAttempt", input),
+    listAttempts: (options) => ipcRenderer.invoke("essay:listAttempts", options),
+    getAttempt: (id) => ipcRenderer.invoke("essay:getAttempt", id),
+    deleteAttempt: (id) => ipcRenderer.invoke("essay:deleteAttempt", id),
+    recommend: (options) => ipcRenderer.invoke("essay:recommend", options),
+  },
+
   app: {
     getInfo: () => ipcRenderer.invoke("app:getInfo"),
     getUpdateState: () => ipcRenderer.invoke("app:getUpdateState"),
@@ -95,5 +133,9 @@ contextBridge.exposeInMainWorld("openexam", {
     },
     generatePaper: (settings, config) =>
       ipcRenderer.invoke("ai:generatePaper", { settings, config }),
+    gradeEssay: (settings, payload) =>
+      ipcRenderer.invoke("ai:gradeEssay", { settings, payload }),
+    recognizeEssay: (settings, imageBase64, mimeType) =>
+      ipcRenderer.invoke("ai:recognizeEssay", { settings, imageBase64, mimeType }),
   }
 });
